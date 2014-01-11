@@ -1,0 +1,18 @@
+# .gitattributes file created 7 November 2013 to address line-endings.
+# Line-ending solution taken from:
+# https://help.github.com/articles/dealing-with-line-endings#platform-all
+#
+## Start of line-endings settings
+# Set default behaviour, in case users don't have core.autocrlf set.
+* text=auto
+
+# Explicitly declare text files we want to always be normalized and converted 
+# to native line endings on checkout.
+*.py text
+
+# Declare files that will always have CRLF line endings on checkout.
+#*.sln text eol=crlf
+
+# Denote all files that are truly binary and should not be modified.
+*.jpg binary
+## End of line-endings settings
