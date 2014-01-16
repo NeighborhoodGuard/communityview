@@ -11,7 +11,7 @@ Uploaded and processed images, and their associated Web pages, are stored for a 
 
 
 ###Installation and Configuration###
-[To be supplied]
+Please see the file `Surveillance/doc/InstallSurveillance.md` for installation and configuration information.
 
 ###License###
 
