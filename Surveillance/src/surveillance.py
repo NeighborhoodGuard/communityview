@@ -26,7 +26,7 @@
 #                                                                              #
 ################################################################################
 
-version = "0.9.1"
+version = "0.9.2pre"
 
 
 import os
@@ -39,6 +39,7 @@ import datetime
 import re
 import threading
 import time
+import logging.handlers
 
 from localsettings import * #@UnusedWildImport (Camera)
 
@@ -150,7 +151,7 @@ def crop_image(img, croparea):
     try:
         cropped_image = img.crop((topleft_x, topleft_y, lowerright_x, lowerright_y))
     except IOError:
-        print "crop_image: Can't crop"
+        logging.error("crop_image: Can't crop")
         cropped_image = None
 
     return cropped_image
@@ -160,7 +161,7 @@ def processImage(indir, filename, cam, master_image=None):
     infilepathfilename = inpath(indir, filename)
     thumbpathfilename = thumbpath(indir, filename)
     mediumpathfilename = mediumpath(indir, filename)
-    print "Processing %s\n" % (infilepathfilename)
+    logging.info("Processing %s\n" % (infilepathfilename))
 
     thumbexists = os.path.exists(thumbpathfilename)
     mediumexists = os.path.exists(mediumpathfilename)
@@ -172,7 +173,7 @@ def processImage(indir, filename, cam, master_image=None):
         try :
             img = Image.open(infilepathfilename)
         except IOError:
-            print "Cannot open file %s" % infilepathfilename
+            logging.error("Cannot open file %s" % infilepathfilename)
 
         cropped_img = crop_image(img, cam.croparea)
 
@@ -181,13 +182,13 @@ def processImage(indir, filename, cam, master_image=None):
             try :
                 cropped_img.save(mediumpathfilename, "JPEG")
             except IOError:
-                print "Cannot save mediumres image %s" % mediumpathfilename
+                logging.error("Cannot save mediumres image %s" % mediumpathfilename)
 
         if (not thumbexists) and (not cropped_img==None):
             try:
                 cropped_img.thumbnail(thumbsize, Image.ANTIALIAS)
             except IOError:
-                print "Cannot make thumbnail %s" % thumbpathfilename
+                logging.error("Cannot make thumbnail %s" % thumbpathfilename)
 
             if master_image != None:
                 #compare current image with Master and make a box around the change
@@ -198,7 +199,7 @@ def processImage(indir, filename, cam, master_image=None):
             try :
                 cropped_img.save(thumbpathfilename, "JPEG")
             except IOError:
-                print "Cannot save thumbnail %s" % thumbpathfilename
+                logging.error("Cannot save thumbnail %s" % thumbpathfilename)
 
   
     # done processing, move raw file to storage, so we won't process it again.
@@ -215,7 +216,7 @@ def processImage_threading(indir, filename, cam, master_image=None):
     
     current_threads = threading.active_count()
     
-    print "current Threads %s" % current_threads
+    logging.info("current Threads %s" % current_threads)
     
     if current_threads >= max_threads :
         processImage(indir, filename, cam, master_image)
@@ -238,10 +239,10 @@ def make_index_page(daydirs, day_index, cam, sequences, datestamp, hidden=False)
 
 
     if not hidden:
-        print "Making Index page"
+        logging.info("Making Index page")
         htmlfilepath = indexhtmlpath(indir, "index")
     else:
-        print "Making 'Hidden' Index Page"
+        logging.info("Making 'Hidden' Index Page")
         htmlfilepath = indexhtmlpath(indir, "index_hidden")
 
     htmlfile = open(htmlfilepath, "w")
@@ -322,7 +323,7 @@ def make_index_page(daydirs, day_index, cam, sequences, datestamp, hidden=False)
 def make_image_html(indir, sequences, sequence_index, image_index):
     sequence = sequences[sequence_index]
     (filename, timestamp) = sequence[image_index]
-    print "making html page for %s\n" % filename
+    logging.info("making html page for %s\n" % filename)
 
 
     if sequence_index - 1 >= 0:
@@ -434,7 +435,7 @@ def make_image_html(indir, sequences, sequence_index, image_index):
 
 def process_sequence(indir, sequences, cam, sequence_index):
         
-    print "next_sequence\n"
+    logging.info("next_sequence\n")
     sequence = sequences[sequence_index]
 #     if sequence_index - 1 >= 0:
 #         prev_sequence = sequences[sequence_index-1]
@@ -512,7 +513,7 @@ def make_subdirs(indir):
 
 
 def sequence_dirlist(files, indir, last_processed_image):
-    print "sequencing dirlist for %s" % indir
+    logging.info("sequencing dirlist for %s" % indir)
     (processingyear,processingmonth, processingday) = dir2date(indir)
 
     timestamp = datetime.datetime(processingyear, processingmonth, processingday, 0, 0, 0)
@@ -549,14 +550,14 @@ def get_images_in_dir(indir):
     images = []
 
     if os.path.isdir(indir):
-        print "loading dirlist for %s" % indir
+        logging.info("loading dirlist for %s" % indir)
         origfiles = os.listdir(indir)
 
         for origfile in origfiles:
             if origfile.lower().endswith(".jpg"):
                 images.append(origfile)
 
-        print "sorting dirlist for %s" % indir
+        logging.info("sorting dirlist for %s" % indir)
         images=sorted(images)
     return images
 
@@ -566,7 +567,7 @@ def make_sequence_and_last_processed_image(indir):
     origfiles = get_images_in_dir(indir)
 
     if 0 == len(origfiles) :
-        print "there are no jpeg files to process in %s" % indir
+        logging.info("there are no jpeg files to process in %s" % indir)
         sequences = None
         last_processed_sequence = None
     else:
@@ -591,9 +592,9 @@ def make_sequence_and_last_processed_image(indir):
         if first_unprocessed_image != None :
             last_processed_image = min(first_unprocessed_image,last_processed_image)
     
-        print "last Processed image %s" % last_processed_image
+        logging.info("last Processed image %s" % last_processed_image)
 
-        print "sorting entire dirlist"
+        logging.info("sorting entire dirlist")
         files = sorted(hiresfiles + origfiles)
 
         (sequences, last_processed_sequence) = sequence_dirlist(files, indir, last_processed_image)
@@ -604,7 +605,7 @@ def make_sequence_and_last_processed_image(indir):
 def process_day(daysdirs, day_index):
 
     for cam in cameras:
-        daydir = daydirs[day_index]
+        daydir = daysdirs[day_index]
 
         indir = os.path.join(daydir, cam.shortname)
     
@@ -612,7 +613,7 @@ def process_day(daysdirs, day_index):
 
             (processingyear, processingmonth, processingday) = dir2date(daydir)
 
-            print "Date %s, %s, %s" % (processingyear, processingmonth, processingday)
+            logging.info("Date %s, %s, %s" % (processingyear, processingmonth, processingday))
 
             make_subdirs(indir)
 
@@ -622,21 +623,21 @@ def process_day(daysdirs, day_index):
                 # make index page.
 
                 datestamp = datetime.date(processingyear, processingmonth, processingday)
-                make_index_page(daydirs, day_index, cam, sequences, datestamp)
-                make_index_page(daydirs, day_index, cam, sequences, datestamp, hidden=True)
+                make_index_page(daysdirs, day_index, cam, sequences, datestamp)
+                make_index_page(daysdirs, day_index, cam, sequences, datestamp, hidden=True)
 
                 # Process image sequence.
 
                 for sequence_index in range(last_processed_sequence, len(sequences)):
                     process_sequence(indir, sequences, cam, sequence_index)
              
-                print 'done'
+                logging.info('done')
 
     return
 
 
 def deltree(deldir):
-    print "deltree: %s" % (deldir)
+    logging.info("deltree: %s" % (deldir))
     files_to_be_deleted = sorted(os.listdir(deldir))
     for file2del in files_to_be_deleted:
         filepath = os.path.join(deldir, file2del)
@@ -644,9 +645,9 @@ def deltree(deldir):
             deltree(filepath)
             rmdir(filepath)
         else:
-            print "deleting %s" % filepath
+            logging.info("deleting %s" % filepath)
             if delete == False :
-                print "would have deleted %s here - to really delete change delete flag to True" % filepath
+                logging.warn("would have deleted %s here - to really delete change delete flag to True" % filepath)
             else :
                 os.remove(filepath)
     rmdir(deldir)
@@ -692,7 +693,7 @@ def process_previous_days(daydirs):
 def processtoday(daysdirs):
     while isdir_today(daysdirs[0]):
         process_day(daysdirs, 0)
-        print "sleeping"
+        logging.info("sleeping")
         time.sleep(60)
     # remaining images in the directory at midnight are processed by one last pass
     process_day(daysdirs, 0)
@@ -702,7 +703,7 @@ def processtoday(daysdirs):
 
 def make_day_list_html(daydirs):
 
-    print "Making daylist Index page"
+    logging.info("Making daylist Index page")
     htmlfilepath = daylisthtmlpath("index")
 
     htmlfile = open(htmlfilepath, "w")
@@ -740,8 +741,28 @@ def make_day_list_html(daydirs):
 
     return
 
+def set_up_logging():
+    if set_up_logging.not_done:
+        # get the root logger and set its level to DEBUG
+        logger = logging.getLogger()
+        logger.setLevel(logging.DEBUG)
+        
+        # set up the rotating log file handler
+        #
+        logfile = logging.handlers.TimedRotatingFileHandler('surveillance.log', 
+                when='midnight', backupCount=logfile_max_days)
+        logfile.setLevel(logfile_log_level)
+        logfile.setFormatter(logging.Formatter(
+                '%(asctime)s %(levelname)-8s %(threadName)-10s %(message)s',
+                '%m-%d %H:%M:%S'))
+        logger.addHandler(logfile)
+        
+        set_up_logging.not_done = False       
+set_up_logging.not_done = True  # logging should only be set up once, but
+                                # set_up_logging() may be called multiple times when testing
 
-if __name__ == "__main__":
+
+def main():
 
     # Setup the threads, don't actually run them yet.
     process_previous_days_thread = threading.Thread(target=process_previous_days, args=())
@@ -782,3 +803,6 @@ if __name__ == "__main__":
                
            
         time.sleep(sleeptime) # sleep for x minutes
+        
+if __name__ == "__main__":
+    main()

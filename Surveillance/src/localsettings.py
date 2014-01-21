@@ -21,6 +21,7 @@
 ################################################################################
 
 from baseclasses import camera
+import logging
 
 ##################################################################################
 #                                                                                #
@@ -63,3 +64,9 @@ hide_sequences_shorter_than_sec = 1 # Sequences lenght 0 sec are hidden
 sequence_gap_sec = 3
 max_threads = 6
 sleeptime = 300 # 600 = 10 minutes, time between main thread wakes up and checks if there are new images to process.
+
+# logging level for output to log file(s)
+logfile_log_level = logging.INFO
+
+# max number of previous log files to save, one log file per day
+logfile_max_days = 10
