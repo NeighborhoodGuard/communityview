@@ -807,7 +807,7 @@ def main():
 
         # Today runs in 1 thread, all prevuious days are handled in 1 thread starting with yesterday and working backwards.
             
-        if isdir_today(daydirs[0]):
+        if len(daydirs) > 0 and isdir_today(daydirs[0]):
             if not processtoday_thread.is_alive():
                 processtoday_thread = threading.Thread(target=processtoday, args=(daydirs,))
                 processtoday_thread.start()
