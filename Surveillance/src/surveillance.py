@@ -26,7 +26,7 @@
 #                                                                              #
 ################################################################################
 
-version = "0.9.2pre"
+version_string = "0.9.2dev"
 
 
 import os
@@ -762,7 +762,23 @@ set_up_logging.not_done = True  # logging should only be set up once, but
                                 # set_up_logging() may be called multiple times when testing
 
 
+# Flag to stop the main loop for test purposes.
+# Only for manipulation by testing code; always set to False in this file
+#
+terminate_main_loop = False 
+
+# Flag to indicate that there were image files to be processed found during the 
+# execution of the main loop.  Only for use by testing code
+#
+images_to_process = False
+
+
 def main():
+    
+    global images_to_process
+    
+    set_up_logging()
+    logging.info("Program Started, version %s", version_string)
 
     # Setup the threads, don't actually run them yet.
     process_previous_days_thread = threading.Thread(target=process_previous_days, args=())
@@ -781,7 +797,8 @@ def main():
 
             daydirs = daydirs[-retain_days:] # only move forward with the daydirs that are not about to be deleted.
 
-
+        # for testability purposes only
+        images_to_process = len(daydirs) > 0
                 
         #reverse sort the days so that today is first
         daydirs = sorted(daydirs, reverse=True)
@@ -803,6 +820,10 @@ def main():
                
            
         time.sleep(sleeptime) # sleep for x minutes
+        
+        if terminate_main_loop:     # for testing purposes only
+            break
+
         
 if __name__ == "__main__":
     main()
