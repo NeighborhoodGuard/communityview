@@ -282,8 +282,13 @@ def make_index_page(daydirs, day_index, cam, sequences, datestamp, hidden=False)
 
 
     navigational_html = """<h4 align="center">"""
-    if day_index < len(daydirs) : 
-        navigational_html += """<a href="../../%s/%s/"><-- Previous day</a>&nbsp;&nbsp; """ % (path2dir(daydirs[day_index+1]), cam.shortname)
+    if day_index+1 < len(daydirs) : 
+        navigational_html += \
+                """<a href="../../%s/%s/"><-- Previous day</a>&nbsp;&nbsp; """ \
+                % (path2dir(daydirs[day_index+1]), cam.shortname)
+    else:
+        navigational_html += \
+                """<font color="grey"><-- Previous day</a>&nbsp;&nbsp; """
     navigational_html += """<a href="%s">UP</a>"""  % (daylisturlfromindex("index"))
     if day_index > 0 : 
         navigational_html += """ &nbsp;&nbsp;<a href="../../%s/%s/">Next day --></a>""" % (path2dir(daydirs[day_index-1]), cam.shortname)
@@ -684,9 +689,10 @@ def isdir_today(indir):
 
 
 def process_previous_days(daydirs):
-    for day_index in range(1, len(daydirs)):
+    if len(daydirs) > 0:
+        start = 1 if isdir_today(daydirs[0]) else 0
+        for day_index in range(start, len(daydirs)):
             process_day(daydirs, day_index)
-
     return
 
 
@@ -800,12 +806,13 @@ def main():
         # for testability purposes only
         images_to_process = len(daydirs) > 0
                 
-        #reverse sort the days so that today is first
+        # reverse sort the days so that most recent day is first
         daydirs = sorted(daydirs, reverse=True)
 
         make_day_list_html(daydirs)
 
-        # Today runs in 1 thread, all prevuious days are handled in 1 thread starting with yesterday and working backwards.
+        # Today runs in 1 thread, all previous days are handled in 1 thread 
+        # starting with most recent day and working backwards.
             
         if len(daydirs) > 0 and isdir_today(daydirs[0]):
             if not processtoday_thread.is_alive():
@@ -813,7 +820,8 @@ def main():
                 processtoday_thread.start()
 
                
-        # Only if previous days is not running, run it to check that everything is procressed.
+        # Only if previous days is not running, run it to check that 
+        # everything is processed.
         if not process_previous_days_thread.is_alive():
             process_previous_days_thread = threading.Thread(target=process_previous_days, args=(daydirs,))
             process_previous_days_thread.start()
