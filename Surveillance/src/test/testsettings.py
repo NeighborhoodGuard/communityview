@@ -45,6 +45,7 @@ from baseclasses import camera
 
 cameras = [
     camera("camera1", "Test Camera 1"),
+    camera("camera2", "Test Camera 2"),
     ]
 
 

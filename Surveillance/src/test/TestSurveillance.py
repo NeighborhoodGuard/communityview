@@ -26,7 +26,10 @@ import testsettings
 import time
 import threading
 import logging
+import os
+import shutil
 
+moduleUnderTest = surveillance
 
 class SleepHook():
     
@@ -62,6 +65,40 @@ class SleepHook():
     @classmethod
     def realSleep(cls, seconds):
         cls.origSleep(seconds)
+        
+def deleteTestFiles():
+    """Initialize the directory on the local machine that will simulate the
+    top-level directory of the Surveillance website (and is also used as the
+    top directory for incoming images.
+    """
+    shutil.rmtree(moduleUnderTest.root, False, None)
+    os.mkdir(moduleUnderTest.root)
+
+
+def buildImages(rootPath, day, location, time, startingSeq, count):
+    """Build the incoming directories and files to simulate the cameras
+    or ftp_upload dropping files into the Web server.
+    :param rootPath: Full pathname of the root directory under which the images
+    will be built.
+    :param day: String representing the name of the 'date' directory.
+    :param location: String representing the name of the camera location. 
+    directory under the date directory.
+    :param time: String representing the time-based portion of the image filename.
+    :param startingSeq: The starting sequence number in the image filenames.
+    :param count: The number of images files to generate.
+    """
+
+    datepath = os.path.join(moduleUnderTest.root, day)
+    if not os.path.exists(datepath):
+        os.mkdir(datepath)
+    
+    locpath = os.path.join(datepath, location)
+    if not os.path.exists(locpath):
+        os.mkdir(locpath)
+        
+    for i in range(startingSeq, startingSeq+count):
+        filepath = os.path.join(locpath, time + "-%05d" % i + ".jpg")
+        shutil.copy("SampleImage.jpg", filepath)
 
 class TestSurveilleance(unittest.TestCase):
 
@@ -69,20 +106,18 @@ class TestSurveilleance(unittest.TestCase):
 
     def setUp(self):
 
-        module = surveillance
-        
-        module.set_up_logging()
+        moduleUnderTest.set_up_logging()
         
         # Set up the testing values for the surveillance global vars
         #
-        module.cameras = testsettings.cameras
-        module.root = testsettings.root
+        moduleUnderTest.cameras = testsettings.cameras
+        moduleUnderTest.root = testsettings.root
        
 #         # hook the date() method
 #         datetime.date = ForceDate
 #           
-#         # set up clean test directories
-#         deleteTestImages()
+        # set up clean test directory
+        deleteTestFiles()
            
         self.origThreadList = threading.enumerate()
         list(self.origThreadList)
@@ -92,10 +127,22 @@ class TestSurveilleance(unittest.TestCase):
         pass
 
 
-    def testNothingToDo(self):
+    def test00NothingToDo(self):
         SleepHook.setCallback(self.terminateTestUpload)
         surveillance.main()
         SleepHook.removeCallback()
+        
+    def test01OldImagesToProcess(self):
+        buildImages(moduleUnderTest.root, "2013-06-30", "camera1", "11-00-00", 1, 10)
+        buildImages(moduleUnderTest.root, "2013-06-30", "camera2", "11-00-02", 1, 10)
+        buildImages(moduleUnderTest.root, "2013-06-29", "camera1", "10-00-00", 1, 10)
+        buildImages(moduleUnderTest.root, "2013-06-29", "camera2", "10-00-02", 1, 10)
+        
+        SleepHook.setCallback(self.terminateTestUpload)
+        surveillance.main()
+        SleepHook.removeCallback()
+        
+        
 
     def terminateTestUpload(self,seconds):
         if threading.currentThread().name == "MainThread":
