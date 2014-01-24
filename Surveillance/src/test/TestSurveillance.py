@@ -28,6 +28,7 @@ import threading
 import logging
 import os
 import shutil
+import inspect
 
 moduleUnderTest = surveillance
 
@@ -99,6 +100,93 @@ def buildImages(rootPath, day, location, time, startingSeq, count):
     for i in range(startingSeq, startingSeq+count):
         filepath = os.path.join(locpath, time + "-%05d" % i + ".jpg")
         shutil.copy("SampleImage.jpg", filepath)
+        
+def get_image_tree():
+    """Return an in-memory representation of the incoming images directory tree
+        [ (date,camera_list), (date,camera_list), ... ]
+                     |
+                     [ (camera, image_list), (camera, image_list), ... ]
+                                     |
+                                     [ image_name, image_name, ... ]
+    """
+    datelist = []
+    for datedir in os.listdir(moduleUnderTest.root):
+        if False:    # not is_date() XXX
+            continue
+        datepath = os.path.join(moduleUnderTest.root, datedir)
+        camlist = []
+        for camdir in os.listdir(datepath):
+            camlist.append((camdir, os.listdir(os.path.join(datepath,camdir))))
+        datelist.append((datedir,camlist))
+                 
+    return datelist
+
+def file_has_data(path):
+    return os.stat(path).st_size > 0
+
+def validateWebsite(image_tree):
+    success = True
+    root = moduleUnderTest.root
+    
+    assert file_has_data(os.path.join(root, "index.html"))
+    rootdirlist = os.listdir(root)
+    if len(rootdirlist) > len(image_tree)+1:
+        success = False
+        logging.error("Extraneous files in %s: %s" % (root, rootdirlist))
+        
+    for (date,camlist) in image_tree:
+        datepath = os.path.join(root, date)
+        datedirlist = os.listdir(datepath)
+        if len(datedirlist) > len(camlist):
+            success = False
+            logging.error("Extraneous files in %s: %s" % (datepath, datedirlist))
+            
+        for (cam, imagelist) in camlist:
+            campath = os.path.join(datepath, cam)
+            camdirlist = os.listdir(campath)
+            # there should be six entries in the camera directory:
+            # hires, html, mediumres, thumbnails, index.html, index_hidden.html
+            if len(camdirlist) > 6:     
+                success = False
+                logging.error("Extraneous files in %s: %s" % (campath, camdirlist))
+                
+            # check for index.html
+            filepath = os.path.join(campath, "index.html")
+            if not file_has_data(filepath):
+                success = False
+                logging.error("Missing website file: %s" % filepath)
+               
+            # check for index_hidden.html
+            filepath = os.path.join(campath, "index_hidden.html")
+            if not file_has_data(filepath):
+                success = False
+                logging.error("Missing website file: %s" % filepath)
+                
+            # list of directories under a camera directory
+            # and the suffixes of filepaths within them
+            dir_suffix = [ 
+                          ("hires", ".jpg"),
+                          ("html", ".html"),
+                          ("mediumres", "_medium.jpg"),
+                          ("thumbnails", "_thumb.jpg"),
+                          ]
+            
+            # check each directory under the camera dir for correct contents
+            for (direct, suffix) in dir_suffix:
+                dirpath = os.path.join(campath, direct)
+                dirlist = os.listdir(dirpath)
+                if len(dirlist) > len(imagelist):
+                    success = False
+                    logging.error("Extraneous files in %s: %s" % dirpath, dirlist)
+                
+                for image in imagelist:
+                    (partpath, unused_ext) = os.path.splitext(os.path.join(dirpath, image))
+                    filepath = partpath + suffix
+                    if not file_has_data(filepath):
+                        success = False
+                        logging.error("Missing website file: %s: " % filepath)
+
+    return success
 
 class TestSurveilleance(unittest.TestCase):
 
@@ -126,23 +214,27 @@ class TestSurveilleance(unittest.TestCase):
     def tearDown(self):
         pass
 
-
     def test00NothingToDo(self):
+        logging.info("========== %s" % inspect.stack()[0][3])
         SleepHook.setCallback(self.terminateTestUpload)
         surveillance.main()
         SleepHook.removeCallback()
         
     def test01OldImagesToProcess(self):
+        logging.info("========== %s" % inspect.stack()[0][3])
         buildImages(moduleUnderTest.root, "2013-06-30", "camera1", "11-00-00", 1, 10)
         buildImages(moduleUnderTest.root, "2013-06-30", "camera2", "11-00-02", 1, 10)
         buildImages(moduleUnderTest.root, "2013-06-29", "camera1", "10-00-00", 1, 10)
         buildImages(moduleUnderTest.root, "2013-06-29", "camera2", "10-00-02", 1, 10)
+        tree = get_image_tree()
         
         SleepHook.setCallback(self.terminateTestUpload)
         surveillance.main()
         SleepHook.removeCallback()
         
-        
+        #f = open("C:/survtesting/2013-06-30/bogusfile", 'w')
+        #f.close()
+        assert validateWebsite(tree)
 
     def terminateTestUpload(self,seconds):
         if threading.currentThread().name == "MainThread":
