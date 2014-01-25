@@ -29,8 +29,31 @@ import logging
 import os
 import shutil
 import inspect
+import datetime
 
 moduleUnderTest = surveillance
+
+class ForceDate(datetime.date):
+    """Force datetime.date.today() to return a specifiable date for testing
+    purposes. Use "datetime.date = ForceDate" in testing code prior to code
+    under test calling datetime.date.today()
+    
+    See also 
+    http://stackoverflow.com/questions/4481954/python-trying-to-mock-datetime-date-today-but-not-working
+    """
+    
+    fdate = datetime.date(2000,1,1)
+    
+    @classmethod
+    def setForcedDate(cls, date):
+        """Set the date that datetime.date.today() will return.
+        :param date: The date object to be returned by today().
+        """
+        cls.fdate = date
+    
+    @classmethod
+    def today(cls):
+        return cls.fdate
 
 class SleepHook():
     
@@ -122,7 +145,10 @@ def get_image_tree():
     return datelist
 
 def file_has_data(path):
-    return os.stat(path).st_size > 0
+    try:
+        return True if os.stat(path).st_size > 0 else False
+    except:
+        return False
 
 def validateWebsite(image_tree):
     success = True
@@ -132,35 +158,43 @@ def validateWebsite(image_tree):
     rootdirlist = os.listdir(root)
     if len(rootdirlist) > len(image_tree)+1:
         success = False
-        logging.error("Extraneous files in %s: %s" % (root, rootdirlist))
+        logging.error("Extraneous file(s) in %s: %s" % (root, rootdirlist))
         
     for (date,camlist) in image_tree:
         datepath = os.path.join(root, date)
+        if not os.path.isdir(datepath):
+            success = False
+            logging.error("Missing directory: %s" % datepath)
+            continue
         datedirlist = os.listdir(datepath)
         if len(datedirlist) > len(camlist):
             success = False
-            logging.error("Extraneous files in %s: %s" % (datepath, datedirlist))
+            logging.error("Extraneous file(s) in %s: %s" % (datepath, datedirlist))
             
         for (cam, imagelist) in camlist:
             campath = os.path.join(datepath, cam)
+            if not os.path.isdir(campath):
+                success = False
+                logging.error("Missing directory: %s" % campath)
+                continue
             camdirlist = os.listdir(campath)
             # there should be six entries in the camera directory:
             # hires, html, mediumres, thumbnails, index.html, index_hidden.html
             if len(camdirlist) > 6:     
                 success = False
-                logging.error("Extraneous files in %s: %s" % (campath, camdirlist))
+                logging.error("Extraneous file(s) in %s: %s" % (campath, camdirlist))
                 
             # check for index.html
             filepath = os.path.join(campath, "index.html")
             if not file_has_data(filepath):
                 success = False
-                logging.error("Missing website file: %s" % filepath)
+                logging.error("Missing or zero length website file: %s" % filepath)
                
             # check for index_hidden.html
             filepath = os.path.join(campath, "index_hidden.html")
             if not file_has_data(filepath):
                 success = False
-                logging.error("Missing website file: %s" % filepath)
+                logging.error("Missing or zero length website file: %s" % filepath)
                 
             # list of directories under a camera directory
             # and the suffixes of filepaths within them
@@ -177,14 +211,14 @@ def validateWebsite(image_tree):
                 dirlist = os.listdir(dirpath)
                 if len(dirlist) > len(imagelist):
                     success = False
-                    logging.error("Extraneous files in %s: %s" % dirpath, dirlist)
+                    logging.error("Extraneous file(s) in %s: %s" % (dirpath, dirlist))
                 
                 for image in imagelist:
                     (partpath, unused_ext) = os.path.splitext(os.path.join(dirpath, image))
                     filepath = partpath + suffix
                     if not file_has_data(filepath):
                         success = False
-                        logging.error("Missing website file: %s: " % filepath)
+                        logging.error("Missing or zero length website file: %s: " % filepath)
 
     return success
 
@@ -194,6 +228,11 @@ class TestSurveilleance(unittest.TestCase):
 
     def setUp(self):
 
+        if moduleUnderTest.set_up_logging.not_done:
+            try:
+                os.remove("surveillance.log")
+            except:
+                pass
         moduleUnderTest.set_up_logging()
         
         # Set up the testing values for the surveillance global vars
@@ -201,11 +240,18 @@ class TestSurveilleance(unittest.TestCase):
         moduleUnderTest.cameras = testsettings.cameras
         moduleUnderTest.root = testsettings.root
        
-#         # hook the date() method
-#         datetime.date = ForceDate
-#           
+        # override the datetime.date().today method
+        datetime.date = ForceDate
+           
         # set up clean test directory
         deleteTestFiles()
+        
+        # reset globals to initial values (may have been changed by previous
+        # test runs)
+        moduleUnderTest.images_to_process = False
+        moduleUnderTest.terminate_main_loop = False
+        moduleUnderTest.terminate_processtoday_loop = False
+        moduleUnderTest.files_to_purge = False
            
         self.origThreadList = threading.enumerate()
         list(self.origThreadList)
@@ -216,36 +262,104 @@ class TestSurveilleance(unittest.TestCase):
 
     def test00NothingToDo(self):
         logging.info("========== %s" % inspect.stack()[0][3])
-        SleepHook.setCallback(self.terminateTestUpload)
-        surveillance.main()
+        SleepHook.setCallback(self.terminateTestRun)
+        moduleUnderTest.main()
         SleepHook.removeCallback()
         
     def test01OldImagesToProcess(self):
         logging.info("========== %s" % inspect.stack()[0][3])
+        ForceDate.setForcedDate(datetime.date(2013,7,1))
         buildImages(moduleUnderTest.root, "2013-06-30", "camera1", "11-00-00", 1, 10)
         buildImages(moduleUnderTest.root, "2013-06-30", "camera2", "11-00-02", 1, 10)
         buildImages(moduleUnderTest.root, "2013-06-29", "camera1", "10-00-00", 1, 10)
         buildImages(moduleUnderTest.root, "2013-06-29", "camera2", "10-00-02", 1, 10)
         tree = get_image_tree()
         
-        SleepHook.setCallback(self.terminateTestUpload)
-        surveillance.main()
+        SleepHook.setCallback(self.terminateTestRun)
+        moduleUnderTest.main()
         SleepHook.removeCallback()
         
         #f = open("C:/survtesting/2013-06-30/bogusfile", 'w')
         #f.close()
         assert validateWebsite(tree)
 
-    def terminateTestUpload(self,seconds):
+    def test02NewImagesToProcess(self):
+        logging.info("========== %s" % inspect.stack()[0][3])
+        ForceDate.setForcedDate(datetime.date(2013,7,1))
+        buildImages(moduleUnderTest.root, "2013-07-01", "camera1", "12-00-00", 1, 10)
+        buildImages(moduleUnderTest.root, "2013-07-01", "camera2", "12-00-02", 1, 10)
+        tree = get_image_tree()
+        
+        SleepHook.setCallback(self.terminateTestRun)
+        moduleUnderTest.main()
+        SleepHook.removeCallback()
+        
+        assert validateWebsite(tree)
+
+    def test03NewAndOldImagesToProcess(self):
+        logging.info("========== %s" % inspect.stack()[0][3])
+        ForceDate.setForcedDate(datetime.date(2013,7,1))
+        buildImages(moduleUnderTest.root, "2013-07-01", "camera1", "12-00-00", 1, 10)
+        buildImages(moduleUnderTest.root, "2013-07-01", "camera2", "12-00-02", 1, 10)
+        buildImages(moduleUnderTest.root, "2013-06-30", "camera1", "11-00-00", 1, 10)
+        buildImages(moduleUnderTest.root, "2013-06-30", "camera2", "11-00-02", 1, 10)
+        buildImages(moduleUnderTest.root, "2013-06-29", "camera1", "10-00-00", 1, 10)
+        buildImages(moduleUnderTest.root, "2013-06-29", "camera2", "10-00-02", 1, 10)
+        tree = get_image_tree()
+        
+        SleepHook.setCallback(self.terminateTestRun)
+        moduleUnderTest.main()
+        SleepHook.removeCallback()
+        
+        # test the test
+        #os.remove(os.path.join(moduleUnderTest.root,"2013-07-01","camera2","hires","12-00-02-00005.jpg"))
+        #open(os.path.join(moduleUnderTest.root,"2013-07-01","camera1","thumbnails","junk.jpg"), "w").close
+        
+        assert validateWebsite(tree)
+        
+    def test04Purge(self):
+        logging.info("========== %s" % inspect.stack()[0][3])
+        ForceDate.setForcedDate(datetime.date(2013,7,1))
+        buildImages(moduleUnderTest.root, "2013-07-01", "camera1", "12-00-00", 1, 10)
+        buildImages(moduleUnderTest.root, "2013-07-01", "camera2", "12-00-02", 1, 10)
+        buildImages(moduleUnderTest.root, "2013-06-30", "camera1", "11-00-00", 1, 10)
+        buildImages(moduleUnderTest.root, "2013-06-30", "camera2", "11-00-02", 1, 10)
+        buildImages(moduleUnderTest.root, "2013-06-29", "camera1", "10-00-00", 1, 10)
+        buildImages(moduleUnderTest.root, "2013-06-29", "camera2", "10-00-02", 1, 10)
+        moduleUnderTest.retain_days = 3
+        tree = get_image_tree() # snapshot of files to be processed, not purged
+
+        # Files to be purged
+        buildImages(moduleUnderTest.root, "2013-06-28", "camera1", "09-00-00", 1, 10)
+        buildImages(moduleUnderTest.root, "2013-06-28", "camera2", "09-00-02", 1, 10)
+        buildImages(moduleUnderTest.root, "2013-06-27", "camera1", "08-00-00", 1, 10)
+        buildImages(moduleUnderTest.root, "2013-06-27", "camera2", "08-00-02", 1, 10)
+        buildImages(moduleUnderTest.root, "2013-06-26", "camera1", "07-00-00", 1, 10)
+        buildImages(moduleUnderTest.root, "2013-06-26", "camera2", "07-00-02", 1, 10)
+        
+        SleepHook.setCallback(self.terminateTestRun)
+        moduleUnderTest.main()
+        SleepHook.removeCallback()
+        
+        # test the test
+        #os.remove(os.path.join(moduleUnderTest.root,"2013-07-01","camera2","hires","12-00-02-00005.jpg"))
+        #open(os.path.join(moduleUnderTest.root,"2013-07-01","camera1","thumbnails","junk.jpg"), "w").close
+        
+        assert validateWebsite(tree)
+
+    def terminateTestRun(self,seconds):
         if threading.currentThread().name == "MainThread":
             self.waitForThreads()   # wait for surveillance to complete current tasks
             # if we've had a pass through surveillance's main loop without
             # finding any work to do, set the terminate flag and return
-            if surveillance.images_to_process == False:
-# XXX                    and surveillance.files_purged == False*:
-                surveillance.terminate_main_loop = True
+            if moduleUnderTest.images_to_process == False \
+                    and moduleUnderTest.files_to_purge == False:
+                moduleUnderTest.terminate_main_loop = True
         else:
-            logging.info("terminateTestUpload (sleepHook) called from non-main thread")
+            # the only other sleep call is in processtoday().
+            # If processtoday() is trying to sleep, it thinks it's done with
+            # its work, so force it to return so that its thread will die
+            moduleUnderTest.terminate_processtoday_loop = True
 
     def waitForThreads(self):
         wait = True

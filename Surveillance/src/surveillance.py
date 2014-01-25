@@ -26,7 +26,7 @@
 #                                                                              #
 ################################################################################
 
-version_string = "0.9.2dev"
+version_string = "0.9.2dev1"
 
 
 import os
@@ -158,57 +158,65 @@ def crop_image(img, croparea):
 
 
 def processImage(indir, filename, cam, master_image=None):
-    infilepathfilename = inpath(indir, filename)
-    thumbpathfilename = thumbpath(indir, filename)
-    mediumpathfilename = mediumpath(indir, filename)
-    logging.info("Processing %s\n" % (infilepathfilename))
-
-    thumbexists = os.path.exists(thumbpathfilename)
-    mediumexists = os.path.exists(mediumpathfilename)
-
-    cropped_img = None
-
-    if not (thumbexists and mediumexists):
-
-        try :
-            img = Image.open(infilepathfilename)
-        except IOError:
-            logging.error("Cannot open file %s" % infilepathfilename)
-
-        cropped_img = crop_image(img, cam.croparea)
-
-        if (not mediumexists) and (not cropped_img==None) :
-            cropped_img.thumbnail(mediumsize, Image.ANTIALIAS)
-            try :
-                cropped_img.save(mediumpathfilename, "JPEG")
-            except IOError:
-                logging.error("Cannot save mediumres image %s" % mediumpathfilename)
-
-        if (not thumbexists) and (not cropped_img==None):
-            try:
-                cropped_img.thumbnail(thumbsize, Image.ANTIALIAS)
-            except IOError:
-                logging.error("Cannot make thumbnail %s" % thumbpathfilename)
-
-            if master_image != None:
-                #compare current image with Master and make a box around the change
-                diff_image = ImageOps.posterize(ImageOps.grayscale(ImageChops.difference(master_image, cropped_img)),1)
-                rect = diff_image.getbbox()
-                if rect != None:
-                    ImageDraw.Draw(cropped_img).rectangle(rect, outline="yellow", fill=None)
-            try :
-                cropped_img.save(thumbpathfilename, "JPEG")
-            except IOError:
-                logging.error("Cannot save thumbnail %s" % thumbpathfilename)
-
-  
-    # done processing, move raw file to storage, so we won't process it again.
-    infilepathfilename = inpath(indir, filename)
-    hirespathfilename = hirespath(indir, filename)
+    logging.info("Starting processImage()")
+    try:
+        infilepathfilename = inpath(indir, filename)
+        thumbpathfilename = thumbpath(indir, filename)
+        mediumpathfilename = mediumpath(indir, filename)
+        logging.info("Processing %s" % (infilepathfilename))
     
-    shutil.move(infilepathfilename,hirespathfilename)
-
+        thumbexists = os.path.exists(thumbpathfilename)
+        mediumexists = os.path.exists(mediumpathfilename)
+    
+        cropped_img = None
+    
+        if not (thumbexists and mediumexists):
+    
+            try :
+                img = Image.open(infilepathfilename)
+            except IOError:
+                logging.error("Cannot open file %s" % infilepathfilename)
+    
+            cropped_img = crop_image(img, cam.croparea)
+            if cropped_img == None:
+                logging.error("Failed to crop image %s, croparea: %s" % (infilepathfilename, str(cam.croparea)))
+    
+            if (not mediumexists) and (not cropped_img==None) :
+                cropped_img.thumbnail(mediumsize, Image.ANTIALIAS)
+                try :
+                    cropped_img.save(mediumpathfilename, "JPEG")
+                except IOError:
+                    logging.error("Cannot save mediumres image %s" % mediumpathfilename)
+    
+            if (not thumbexists) and (not cropped_img==None):
+                try:
+                    cropped_img.thumbnail(thumbsize, Image.ANTIALIAS)
+                except IOError:
+                    logging.error("Cannot make thumbnail %s" % thumbpathfilename)
+    
+                if master_image != None:
+                    #compare current image with Master and make a box around the change
+                    diff_image = ImageOps.posterize(ImageOps.grayscale(ImageChops.difference(master_image, cropped_img)),1)
+                    rect = diff_image.getbbox()
+                    if rect != None:
+                        ImageDraw.Draw(cropped_img).rectangle(rect, outline="yellow", fill=None)
+                try :
+                    cropped_img.save(thumbpathfilename, "JPEG")
+                except IOError:
+                    logging.error("Cannot save thumbnail %s" % thumbpathfilename)
+    
+      
+        # done processing, move raw file to storage, so we won't process it again.
+        infilepathfilename = inpath(indir, filename)
+        hirespathfilename = hirespath(indir, filename)
+        
+        shutil.move(infilepathfilename,hirespathfilename)
+    except Exception, e:
+        logging.error("Unexpected exception in processImage()")
+        logging.exception(e)
+        
     # return the thumbnail image
+    logging.info("Returning from processImage()")
     return cropped_img
 
 
@@ -328,7 +336,7 @@ def make_index_page(daydirs, day_index, cam, sequences, datestamp, hidden=False)
 def make_image_html(indir, sequences, sequence_index, image_index):
     sequence = sequences[sequence_index]
     (filename, timestamp) = sequence[image_index]
-    logging.info("making html page for %s\n" % filename)
+    logging.info("making html page for %s" % filename)
 
 
     if sequence_index - 1 >= 0:
@@ -440,7 +448,7 @@ def make_image_html(indir, sequences, sequence_index, image_index):
 
 def process_sequence(indir, sequences, cam, sequence_index):
         
-    logging.info("next_sequence\n")
+    logging.info("next_sequence")
     sequence = sequences[sequence_index]
 #     if sequence_index - 1 >= 0:
 #         prev_sequence = sequences[sequence_index-1]
@@ -672,12 +680,38 @@ def get_daydirs():
 
     return daydirs
 
+def daydirs_with_work(daydirs):
+    """Check a list of daydirs and return a list of those that have
+    unprocessed images, i.e., JPEGs in a (camera) directory immediately below
+    the daydir.
+    """
+    worklist = []
+    for daypath in daydirs:
+        found = False
+        for camd in os.listdir(daypath):
+            camdpath = os.path.join(daypath, camd)
+            if os.path.isdir(camdpath):
+                for f in os.listdir(camdpath):
+                    if f.lower().endswith(".jpg"):
+                        found = True
+                        break
+            if found:
+                break
+        if found:
+            worklist.append(daypath)
+    logging.info("daydirs_with_work returns: %s" % worklist)
+    return worklist
+
 
 def purge_images(daydirs):
-
-    for del_dir in daydirs:
-        deltree(del_dir)
-
+    logging.info("Starting purge_images()")
+    try:
+        for del_dir in daydirs:
+            deltree(del_dir)
+    except Exception, e:
+        logging.error("Unexpected exception in purge_images()")
+        logging.exception(e)
+    logging.info("Returning from purge_images()")
     return
 
 
@@ -689,21 +723,42 @@ def isdir_today(indir):
 
 
 def process_previous_days(daydirs):
-    if len(daydirs) > 0:
-        start = 1 if isdir_today(daydirs[0]) else 0
-        for day_index in range(start, len(daydirs)):
-            process_day(daydirs, day_index)
+    logging.info("Starting process_previous_days()")
+    try:
+        if len(daydirs) > 0:
+            start = 1 if isdir_today(daydirs[0]) else 0
+            for day_index in range(start, len(daydirs)):
+                process_day(daydirs, day_index)
+    except Exception, e:
+        logging.error("Unexpected exception in process_previous_days()")
+        logging.exception(e)
+    logging.info("Returning from process_previous_days()")
     return
 
 
-def processtoday(daysdirs):
-    while isdir_today(daysdirs[0]):
-        process_day(daysdirs, 0)
-        logging.info("sleeping")
-        time.sleep(60)
-    # remaining images in the directory at midnight are processed by one last pass
-    process_day(daysdirs, 0)
+# Flag to stop the processtoday() loop for test purposes.
+# Only for manipulation by testing code; always set to False in this file
+#
+terminate_processtoday_loop = False 
 
+def processtoday(daysdirs):
+    logging.info("starting processtoday()")
+    try:
+        while isdir_today(daysdirs[0]):
+            process_day(daysdirs, 0)
+            logging.info("sleeping")
+            time.sleep(60)
+            if terminate_processtoday_loop:
+                break
+    
+        if not terminate_processtoday_loop:
+            # remaining images in the directory at midnight are processed by one last pass
+            process_day(daysdirs, 0)
+    except Exception, e:
+        logging.error("Unexpected exception in processtoday()")
+        logging.exception(e)
+
+    logging.info("returning from processtoday()")
     return
 
 
@@ -778,60 +833,73 @@ terminate_main_loop = False
 #
 images_to_process = False
 
+# Flag to indicate that there were files to be purged found during the 
+# execution of the main loop.  Only for use by testing code
+#
+files_to_purge = False
+
 
 def main():
     
     global images_to_process
+    global files_to_purge
     
     set_up_logging()
     logging.info("Program Started, version %s", version_string)
 
-    # Setup the threads, don't actually run them yet.
-    process_previous_days_thread = threading.Thread(target=process_previous_days, args=())
-    processtoday_thread = threading.Thread(target=processtoday, args=())
-
-    purge_thread = threading.Thread(target=purge_images, args=())
-
-    while True:
+    try:
+        # Setup the threads, don't actually run them yet.
+        process_previous_days_thread = threading.Thread(target=process_previous_days, args=())
+        processtoday_thread = threading.Thread(target=processtoday, args=())
     
-        daydirs = get_daydirs()
-
-        if len(daydirs) > retain_days:
-            if not purge_thread.is_alive():
-                purge_thread = threading.Thread(target=purge_images, args=(daydirs[:-retain_days],))
-                purge_thread.start()
-
-            daydirs = daydirs[-retain_days:] # only move forward with the daydirs that are not about to be deleted.
-
-        # for testability purposes only
-        images_to_process = len(daydirs) > 0
-                
-        # reverse sort the days so that most recent day is first
-        daydirs = sorted(daydirs, reverse=True)
-
-        make_day_list_html(daydirs)
-
-        # Today runs in 1 thread, all previous days are handled in 1 thread 
-        # starting with most recent day and working backwards.
-            
-        if len(daydirs) > 0 and isdir_today(daydirs[0]):
-            if not processtoday_thread.is_alive():
-                processtoday_thread = threading.Thread(target=processtoday, args=(daydirs,))
-                processtoday_thread.start()
-
-               
-        # Only if previous days is not running, run it to check that 
-        # everything is processed.
-        if not process_previous_days_thread.is_alive():
-            process_previous_days_thread = threading.Thread(target=process_previous_days, args=(daydirs,))
-            process_previous_days_thread.start()
-               
-           
-        time.sleep(sleeptime) # sleep for x minutes
+        purge_thread = threading.Thread(target=purge_images, args=())
+    
+        while True:
         
-        if terminate_main_loop:     # for testing purposes only
-            break
-
+            daydirs = get_daydirs()
+    
+            files_to_purge = len(daydirs) > retain_days
+            
+            if len(daydirs) > retain_days:
+                if not purge_thread.is_alive():
+                    purge_thread = threading.Thread(target=purge_images, args=(daydirs[:-retain_days],))
+                    purge_thread.start()
+    
+                daydirs = daydirs[-retain_days:] # only move forward with the daydirs that are not about to be deleted.
+    
+            # reverse sort the days so that most recent day is first
+            daydirs = sorted(daydirs, reverse=True)
+    
+            make_day_list_html(daydirs)
+            
+            daydirs = daydirs_with_work(daydirs)
+    
+            # for testability purposes only
+            images_to_process = len(daydirs) > 0
+                    
+            # Today runs in 1 thread, all previous days are handled in 1 thread 
+            # starting with most recent day and working backwards.
+                
+            if len(daydirs) > 0 and isdir_today(daydirs[0]):
+                if not processtoday_thread.is_alive():
+                    processtoday_thread = threading.Thread(target=processtoday, args=(daydirs,))
+                    processtoday_thread.start()
+    
+                   
+            # Only if previous days is not running, run it to check that 
+            # everything is processed.
+            if not process_previous_days_thread.is_alive():
+                process_previous_days_thread = threading.Thread(target=process_previous_days, args=(daydirs,))
+                process_previous_days_thread.start()
+                   
+               
+            time.sleep(sleeptime) # sleep for x minutes
+            
+            if terminate_main_loop:     # for testing purposes only
+                break
+    except Exception, e:
+        logging.error("Unexpected exception in main loop")
+        logging.exception(e)
         
 if __name__ == "__main__":
     main()
