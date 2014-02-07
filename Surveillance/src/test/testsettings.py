@@ -1,7 +1,7 @@
 ################################################################################
 #
-# Copyright (C) 2012-2014 Neighborhood Guard, Inc.  All rights reserved.
-# Original author: Jesper Jercenoks
+# Copyright (C) 2014 Neighborhood Guard, Inc.  All rights reserved.
+# Original author: Douglas Kerr
 # 
 # This file is part of Surveillance.
 # 
@@ -21,7 +21,7 @@
 ################################################################################
 
 from baseclasses import camera
-import logging
+#import logging
 
 ##################################################################################
 #                                                                                #
@@ -44,7 +44,8 @@ import logging
 
 
 cameras = [
-    camera("camera_location_shortname", "camera_location_longname"),
+    camera("camera1", "Test Camera 1"),
+    camera("camera2", "Test Camera 2"),
     ]
 
 
@@ -54,19 +55,6 @@ cameras = [
 #                                                                                #
 #                                                                                #
 ##################################################################################
-		
-root = "/home/example_user/upload_directory/"
+        
+root = "c:/survtesting"
 
-retain_days = 30 # number of days to retain images.
-hide_sequences_shorter_than_sec = 1 # Sequences lenght 0 sec are hidden
-
-# the number of seconds between two sequences.
-sequence_gap_sec = 3
-max_threads = 6
-sleeptime = 300 # 600 = 10 minutes, time between main thread wakes up and checks if there are new images to process.
-
-# logging level for output to log file(s)
-logfile_log_level = logging.INFO
-
-# max number of previous log files to save, one log file per day
-logfile_max_days = 10
