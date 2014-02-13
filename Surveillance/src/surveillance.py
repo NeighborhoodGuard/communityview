@@ -26,7 +26,7 @@
 #                                                                              #
 ################################################################################
 
-version_string = "0.9.2"
+version_string = "0.9.3"
 
 
 import os
@@ -151,7 +151,8 @@ def crop_image(img, croparea):
     try:
         cropped_image = img.crop((topleft_x, topleft_y, lowerright_x, lowerright_y))
     except IOError:
-        logging.error("crop_image: Can't crop")
+        logging.error("crop_image: Can't crop. Img size: (%d, %d); crop area topleft: (%d, %d), lowerright (%d, %d)" \
+                      % (size_x, size_y, topleft_x, topleft_y, lowerright_x, lowerright_y))
         cropped_image = None
 
     return cropped_image
@@ -173,15 +174,32 @@ def processImage(indir, filename, cam, master_image=None):
         cropped_img = None
     
         if not (thumbexists and mediumexists):
+            img = None
     
             try :
                 img = Image.open(infilepathfilename)
-            except IOError:
-                logging.error("Cannot open file %s" % infilepathfilename)
-    
-            cropped_img = crop_image(img, cam.croparea)
+            except IOError, e:
+                logging.error("Cannot open file %s: %s" % (infilepathfilename, repr(e)))
+                
+            if img:
+                cropped_img = crop_image(img, cam.croparea)
+                del img     # close img
+
             if cropped_img == None:
                 logging.error("Failed to crop image %s, croparea: %s" % (infilepathfilename, str(cam.croparea)))
+                # crop failure is likely due to attempting to process the
+                # incoming image while it is still being uploaded. Return from
+                # processImage() here and leave image in incoming dir--don't
+                # mark it "done" by moving it to the hires dir. When we get
+                # around to processing this image again, it will probably work
+                # correctly.  However, if the image mod time is more than an
+                # hour old, it's not likely to still be uploading, so assume
+                # it's just broken and let the normal code move it to hires
+                # so we don't try to process it again
+                if os.path.getmtime(infilepathfilename) >= (time.time() - 3600):
+                    logging.info("Returning from processImage()" \
+                                 + ", leaving original image in place")
+                    return cropped_img
     
             if (not mediumexists) and (not cropped_img==None) :
                 cropped_img.thumbnail(mediumsize, Image.ANTIALIAS)

@@ -259,6 +259,39 @@ class TestSurveilleance(unittest.TestCase):
 
     def tearDown(self):
         pass
+    
+    def test00CropFail(self):
+        # make the dirs
+        cam = moduleUnderTest.cameras[0]
+        indir = os.path.join(moduleUnderTest.root, "2013-07-01", cam.shortname)
+        os.makedirs(os.path.join(indir, "hires"))
+        
+        # put a fragment of a test jpg in the indir
+        tfn = "SampleImage.jpg"
+        tfd = os.open(tfn, os.O_RDONLY|os.O_BINARY)
+        buf = os.read(tfd, 8192)
+        logging.info("test00CropFail(): buf size is %d" % len(buf))
+        os.close(tfd)
+        ifn = "12-00-01-12345.jpg"
+        ifp = os.path.join(indir, ifn)
+        infd = os.open(ifp, os.O_WRONLY|os.O_BINARY|os.O_CREAT)
+        os.write(infd, buf)
+        os.fsync(infd)
+        os.close(infd)
+        time.sleep(2)
+        
+        hfp = os.path.join(indir, "hires", ifn)
+        
+        # run processImage().  
+        # Since the mod time is recent, The file should stay in indir
+        moduleUnderTest.processImage(indir, ifn, cam)
+        assert os.path.exists(ifp) and not os.path.exists(hfp)
+        
+        # set the file's mod time back over an hour and run processImage().
+        # This time the file should move to the hires dir
+        os.utime(ifp, (int(time.time()), time.time()-3602))
+        moduleUnderTest.processImage(indir, ifn, cam)
+        assert not os.path.exists(ifp) and os.path.exists(hfp)
 
     def test00NothingToDo(self):
         logging.info("========== %s" % inspect.stack()[0][3])
