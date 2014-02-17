@@ -158,7 +158,9 @@ def crop_image(img, croparea):
 
 
 def processImage(indir, filename, cam, master_image=None):
+    global images_to_process
     logging.info("Starting processImage()")
+    images_to_process = True    # only for testing purposes
     try:
         infilepathfilename = inpath(indir, filename)
         thumbpathfilename = thumbpath(indir, filename)
@@ -680,29 +682,6 @@ def get_daydirs():
 
     return daydirs
 
-def daydirs_with_work(daydirs):
-    """Check a list of daydirs and return a list of those that have
-    unprocessed images, i.e., JPEGs in a (camera) directory immediately below
-    the daydir.
-    """
-    worklist = []
-    for daypath in daydirs:
-        found = False
-        for camd in os.listdir(daypath):
-            camdpath = os.path.join(daypath, camd)
-            if os.path.isdir(camdpath):
-                for f in os.listdir(camdpath):
-                    if f.lower().endswith(".jpg"):
-                        found = True
-                        break
-            if found:
-                break
-        if found:
-            worklist.append(daypath)
-    logging.info("daydirs_with_work returns: %s" % worklist)
-    return worklist
-
-
 def purge_images(daydirs):
     logging.info("Starting purge_images()")
     try:
@@ -855,6 +834,7 @@ def main():
         purge_thread = threading.Thread(target=purge_images, args=())
     
         while True:
+            images_to_process = False   # only for testing purposes
         
             daydirs = get_daydirs()
     
@@ -871,11 +851,6 @@ def main():
             daydirs = sorted(daydirs, reverse=True)
     
             make_day_list_html(daydirs)
-            
-            daydirs = daydirs_with_work(daydirs)
-    
-            # for testability purposes only
-            images_to_process = len(daydirs) > 0
                     
             # Today runs in 1 thread, all previous days are handled in 1 thread 
             # starting with most recent day and working backwards.
