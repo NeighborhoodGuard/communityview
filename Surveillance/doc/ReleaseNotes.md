@@ -1,5 +1,23 @@
 # Release Notes for Surveillance
 
+## v0.9.3 - 2014/02/18
+_Doug Kerr_
+
+### Changes
+
+* Fix bug causing thumbnails and medium-resolution images not to be generated for some images.
+* Fix bug introduced in v0.9.2 causing `Previous day` and `Next day` links in day pages to be grayed out or point to wrong day page.
+
+### Known Issues
+
+* The `Next day` links in day pages are sometimes incorrectly grayed out.
+
+### To Do
+
+* Move sequence-page navigation to top of page.
+* Add UI link to source code.
+* Add graceful shutdown.
+
 ## v0.9.2 - 2014/02/06
 _Doug Kerr_
 
