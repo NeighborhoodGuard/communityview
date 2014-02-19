@@ -26,7 +26,7 @@
 #                                                                              #
 ################################################################################
 
-version_string = "0.9.2"
+version_string = "0.9.3"
 
 
 import os
@@ -151,14 +151,17 @@ def crop_image(img, croparea):
     try:
         cropped_image = img.crop((topleft_x, topleft_y, lowerright_x, lowerright_y))
     except IOError:
-        logging.error("crop_image: Can't crop")
+        logging.error("crop_image: Can't crop. Img size: (%d, %d); crop area topleft: (%d, %d), lowerright (%d, %d)" \
+                      % (size_x, size_y, topleft_x, topleft_y, lowerright_x, lowerright_y))
         cropped_image = None
 
     return cropped_image
 
 
 def processImage(indir, filename, cam, master_image=None):
+    global images_to_process
     logging.info("Starting processImage()")
+    images_to_process = True    # only for testing purposes
     try:
         infilepathfilename = inpath(indir, filename)
         thumbpathfilename = thumbpath(indir, filename)
@@ -171,15 +174,32 @@ def processImage(indir, filename, cam, master_image=None):
         cropped_img = None
     
         if not (thumbexists and mediumexists):
+            img = None
     
             try :
                 img = Image.open(infilepathfilename)
-            except IOError:
-                logging.error("Cannot open file %s" % infilepathfilename)
-    
-            cropped_img = crop_image(img, cam.croparea)
+            except IOError, e:
+                logging.error("Cannot open file %s: %s" % (infilepathfilename, repr(e)))
+                
+            if img:
+                cropped_img = crop_image(img, cam.croparea)
+                del img     # close img
+
             if cropped_img == None:
                 logging.error("Failed to crop image %s, croparea: %s" % (infilepathfilename, str(cam.croparea)))
+                # crop failure is likely due to attempting to process the
+                # incoming image while it is still being uploaded. Return from
+                # processImage() here and leave image in incoming dir--don't
+                # mark it "done" by moving it to the hires dir. When we get
+                # around to processing this image again, it will probably work
+                # correctly.  However, if the image mod time is more than an
+                # hour old, it's not likely to still be uploading, so assume
+                # it's just broken and let the normal code move it to hires
+                # so we don't try to process it again
+                if os.path.getmtime(infilepathfilename) >= (time.time() - 3600):
+                    logging.info("Returning from processImage()" \
+                                 + ", leaving original image in place")
+                    return cropped_img
     
             if (not mediumexists) and (not cropped_img==None) :
                 cropped_img.thumbnail(mediumsize, Image.ANTIALIAS)
@@ -680,29 +700,6 @@ def get_daydirs():
 
     return daydirs
 
-def daydirs_with_work(daydirs):
-    """Check a list of daydirs and return a list of those that have
-    unprocessed images, i.e., JPEGs in a (camera) directory immediately below
-    the daydir.
-    """
-    worklist = []
-    for daypath in daydirs:
-        found = False
-        for camd in os.listdir(daypath):
-            camdpath = os.path.join(daypath, camd)
-            if os.path.isdir(camdpath):
-                for f in os.listdir(camdpath):
-                    if f.lower().endswith(".jpg"):
-                        found = True
-                        break
-            if found:
-                break
-        if found:
-            worklist.append(daypath)
-    logging.info("daydirs_with_work returns: %s" % worklist)
-    return worklist
-
-
 def purge_images(daydirs):
     logging.info("Starting purge_images()")
     try:
@@ -855,6 +852,7 @@ def main():
         purge_thread = threading.Thread(target=purge_images, args=())
     
         while True:
+            images_to_process = False   # only for testing purposes
         
             daydirs = get_daydirs()
     
@@ -871,11 +869,6 @@ def main():
             daydirs = sorted(daydirs, reverse=True)
     
             make_day_list_html(daydirs)
-            
-            daydirs = daydirs_with_work(daydirs)
-    
-            # for testability purposes only
-            images_to_process = len(daydirs) > 0
                     
             # Today runs in 1 thread, all previous days are handled in 1 thread 
             # starting with most recent day and working backwards.
