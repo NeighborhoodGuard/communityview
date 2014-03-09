@@ -13,7 +13,7 @@ These instructions assume you have the following:
 	The name `my_neighborhood.org` will be used in as the example  top-level domain name.
 
 * **a user account on DreamHost.**  
-	This should be the account that your cameras or the FTP_Upload software uses to transfer images to the DreamHost server via FTP.  In these instructions, we'll use the example account name `nguser`.  The home directory of the account will be `/home/nguser`.  This account must have _shell_ access (that is, not just FTP or SFTP) in order to set up the cron job described below.  It's also very handy for debugging in case you have problems with the initial set up.
+	This should be the account that your cameras or the FTP_Upload software uses to transfer images to the DreamHost server via FTP.  In these instructions, we'll use the example account name `nguser`.  The home directory of the account will be `/home/nguser`.  This account must have _shell_ access in order to set up the cron job described below.  Shell access is also very handy for debugging in case you have problems with the initial set up.  Additionally, the account must have FTP access to allow images to be uploaded to the server (`Disallow FTP?` box unchecked on the DreamHost `Manage Users` page).
 
 * **basic shell abilities.**  
 	This includes the ability to navigate the file system on the DreamHost server using shell commands, create directories and optionally edit text files.
