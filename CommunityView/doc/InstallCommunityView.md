@@ -1,4 +1,4 @@
-# Installing Neighborhood Guard's Surveillance Software
+## Installing Neighborhood Guard's CommunityView Software ##
 
 _Note: These instructions are tailored to using DreamHost as the hosting service, as this has been our platform to date. Sites hosted by other services will vary in the details, particularly in the areas of creating a domain for the Web server, setting up Basic Authentication, and crontab entries._
 
@@ -21,9 +21,9 @@ These instructions assume you have the following:
 * **basic FTP abilities.**  
 	The ability establish an FTP connection from your local machine to the DreamHost server, and copy files to the server.  You can use either a GUI FTP client on your local machine, or a command-line client.
 
-### 1. Create a Domain for the Surveillance Website
+### 1. Create a Domain for the CommunityView Website
 
-When users navigate to this domain in  a browser, they will see the home (top-level) page of the website that the Surveillance software creates.  In these instructions, the example domain name we will use is 	`cameras.my_neighborhood.org`.  Users will therefore point their browsers to `http://cameras.my_neighborhood.org` to see the website built by the Surveillance software.
+When users navigate to this domain in  a browser, they will see the home (top-level) page of the website that the CommunityView software creates.  In these instructions, the example domain name we will use is 	`cameras.my_neighborhood.org`.  Users will therefore point their browsers to `http://cameras.my_neighborhood.org` to see the website built by the CommunityView software.
 
 1. Log into your DreamHost Web Panel account,  and in the `Main Menu` navigation panel on the left, under `Domains` click on `Manage Domains`.
 
@@ -39,17 +39,17 @@ When users navigate to this domain in  a browser, they will see the home (top-le
 
 This will establish your domain and create a directory by the same name under the home directory of your user account.  In our example, this directory would be `/home/nguser/cameras.my_neighborhood.org`.
 
-### 2. Create a Directory for the Surveillance Code
+### 2. Create a Directory for the CommunityView Code
 
-Create a directory directly underneath the directory you created in the previous section for the Surveillance website.  Conventionally, we call this directory `surveillance`, so following our example, you would create a directory with the following path, `/home/nguser/cameras.my_neighborhood.org/surveillance`.  You can do this via either FTP from you local machine, or via shell command on the server.
+Create a directory directly underneath the directory you created in the previous section for the CommunityView website.  Conventionally, we call this directory `communityview`, so following our example, you would create a directory with the following path, `/home/nguser/cameras.my_neighborhood.org/communityview`.  You can do this via either FTP from you local machine, or via shell command on the server.
 
-### 3. Get the Latest Surveillance Source Code From GitHub
+### 3. Get the Latest CommunityView Source Code From GitHub
 
-Go to the Surveillance code repository on GitHub, [https://github.com/NeighborhoodGuard/surveillance](https://github.com/NeighborhoodGuard/surveillance), and download the code as a ZIP file by clicking the `Download ZIP` button in the lower right of the page.  The three Python source files required are in the directory `surveillance-master/Surveillance/src` within the ZIP file, `baseclasses.py`, `localsettings.py` and `surveillance.py`.  Extract these into a convenient directory on your local machine.
+Go to the CommunityView code repository on GitHub, [https://github.com/NeighborhoodGuard/communityview](https://github.com/NeighborhoodGuard/communityview), and download the code as a ZIP file by clicking the `Download ZIP` button in the lower right of the page.  The three Python source files required are in the directory `communityview-master/CommunityView/src` within the ZIP file, `baseclasses.py`, `localsettings.py` and `communityview.py`.  Extract these into a convenient directory on your local machine.
 
-In addition, you will need a script that is used to restart the Surveillance software when the server it's running on is rebooted, or in case the software itself stops running.  The restart script is in the directory `surveillance-master/Surveillance/scripts` and is called `check_video_restart.bash`.  Extract it into the same directory where you extracted the Python files.
+In addition, you will need a script that is used to restart the CommunityView software when the server it's running on is rebooted, or in case the software itself stops running.  The restart script is in the directory `communityview-master/CommunityView/scripts` and is called `check_video_restart.bash`.  Extract it into the same directory where you extracted the Python files.
 
-You will need to edit the files `localsettings.py` and `check_video_restart.bash` to configure Surveillance for your particular site.  You can do this either before you transfer the files to the DreamHost server, or afterwards.
+You will need to edit the files `localsettings.py` and `check_video_restart.bash` to configure CommunityView for your particular site.  You can do this either before you transfer the files to the DreamHost server, or afterwards.
 
 In our example you will edit them first, then transfer them to DreamHost.
 
@@ -73,7 +73,7 @@ You *must* edit the value of the `cameras` list, and the `root` directory path. 
 
 #### The `cameras` List
 
-The `cameras` list is more complicated that most variable assignments.  `cameras` is assigned a set of values called an *list*.  Each "value" in the list is a `camera` object consisting in turn of several values.  Each line of the form `camera( ... ),` represents one camera from which images are uploaded to the Surveillance software.  The `cameras` list tells the Surveillance code how many cameras will be uploading images, what their names are, and other, optional information.  
+The `cameras` list is more complicated that most variable assignments.  `cameras` is assigned a set of values called an *list*.  Each "value" in the list is a `camera` object consisting in turn of several values.  Each line of the form `camera( ... ),` represents one camera from which images are uploaded to the CommunityView software.  The `cameras` list tells the CommunityView code how many cameras will be uploading images, what their names are, and other, optional information.  
 
 There are two required values in each camera object, the `shortname` and the `longname`.  When an IP camera (or the ftp_upload software) uploads images to a Neighborhood Guard server, it creates a two-level directory structure for the images in the form:
 
@@ -81,7 +81,7 @@ There are two required values in each camera object, the `shortname` and the `lo
 >*date*/*location*/*image_name*.jpg
 > 
 
-The `shortname` is the name of the _location_ directory that the IP camera creates when it uploads an image.  This is configured in the IP camera by the person setting up the camera.  Conventionally we use this to indicate the location of the camera, e.g., `1234Main` for a camera located at 1234 Main St.  The `longname` is a more human-readable form of the location that will be displayed on the Surveillance Web pages, e.g., "1234 Main St."
+The `shortname` is the name of the _location_ directory that the IP camera creates when it uploads an image.  This is configured in the IP camera by the person setting up the camera.  Conventionally we use this to indicate the location of the camera, e.g., `1234Main` for a camera located at 1234 Main St.  The `longname` is a more human-readable form of the location that will be displayed on the CommunityView Web pages, e.g., "1234 Main St."
 
 Continuing with this example location, the `cameras` list for a camera at this location, plus another at 500 West Ave. would look like:
 
@@ -94,32 +94,32 @@ Note that there is one line for each camera, and that there is a comma at the en
 
 #### The `root` Directory
 
-The `root` variable tells the Surveillance code where the "root," or top level of the directory tree is into which the image files will be uploaded.  Set this to be the directory you established in Section 1 as the top-level directory for the Surveillance website.  In our example above, this is `/home/nguser/cameras.my_neigborhood.org`, so the example variable assignment would look like,
+The `root` variable tells the CommunityView code where the "root," or top level of the directory tree is into which the image files will be uploaded.  Set this to be the directory you established in Section 1 as the top-level directory for the CommunityView website.  In our example above, this is `/home/nguser/cameras.my_neigborhood.org`, so the example variable assignment would look like,
 
 	root = "/home/nguser/cameras.my_neigborhood.org"
 
 
 ### 5. Edit `check_video_restart.bash`
 
-This script checks that the Surveillance Python code is running, and if it is not, restarts the program. In a later section below, you will set up the DreamHost server to run this script periodically to insure that the Surveillance program continues to run.
+This script checks that the CommunityView Python code is running, and if it is not, restarts the program. In a later section below, you will set up the DreamHost server to run this script periodically to insure that the CommunityView program continues to run.
 
-The only change that needs to be made to this script is to configure that path to the `surveillance` directory.  Change the line in the script that looks like this:
+The only change that needs to be made to this script is to configure that path to the `communityview` directory.  Change the line in the script that looks like this:
 
-	cd /your/path/to/surveillance
+	cd /your/path/to/communityview
 
-so that the path points to the `surveillance` directory you created in Section 2, above.  Using our example values, the line would  look like this:
+so that the path points to the `communityview` directory you created in Section 2, above.  Using our example values, the line would  look like this:
 
-	cd /home/nguser/cameras.my_neighborhood.org/surveillance
+	cd /home/nguser/cameras.my_neighborhood.org/communityview
 
 Now that the required changes have been made, you can copy the source code to the Web server.
 
 ### 6. Copy the Source Code to the Web Server
 
-Use FTP to copy the four source files, including your newly modified versions of `localsettings.py` and `check_video_restart.bash`, to your `surveillance` directory on the Web server.  You can use any FTP client you like.
+Use FTP to copy the four source files, including your newly modified versions of `localsettings.py` and `check_video_restart.bash`, to your `communityview` directory on the Web server.  You can use any FTP client you like.
 
 ### 7. Set Up the Server to Run `check_video_restart.bash` Periodically
 
-As mentioned above, we want the Web server to run `check_video_restart.bash` periodically to restart the Surveillance program in case the server machine is restarted, or in case the program fails.
+As mentioned above, we want the Web server to run `check_video_restart.bash` periodically to restart the CommunityView program in case the server machine is restarted, or in case the program fails.
 
 Log into your DreamHost Web Panel account and perform the following steps:
 
@@ -129,13 +129,13 @@ Log into your DreamHost Web Panel account and perform the following steps:
 
 1. On the next page, click on the `User` pulldown menu, and select the user under whose auspices the cron job will be run.  This should be the name of the user account that is used to upload the image files via FTP.  In our example, this is `nguser`.
 
-1. In the `Title` field, input a name of your choice for this cron job.  For example, "Restart Surveillance."
+1. In the `Title` field, input a name of your choice for this cron job.  For example, "Restart CommunityView."
 
 1. In the `Email output to` field, put an email address that you can monitor while you check to make sure everything is working.  You can disable the sending of emails once you're satisfied that all is well.
 
 1. In the `Command to run` field, enter `/bin/bash` followed by a space and the full path name of the restart script.  Using our example values, the entry would look like this:
 
-		/bin/bash /home/nguser/cameras.my_neighborhood.org/surveillance/check_video_restart.bash
+		/bin/bash /home/nguser/cameras.my_neighborhood.org/communityview/check_video_restart.bash
 
 1. Uncheck the `Use locking` checkbox.
 
@@ -145,13 +145,13 @@ Log into your DreamHost Web Panel account and perform the following steps:
 
 ### 8. Set Up Access Restrictions for Your Website
 
-To avoid unauthorized snooping on your neighborhood, you will want to restrict access to the Surveillance website.  You can do this easily using *Basic Authentication* to set a user name and password pair that a user will have to supply before being able to view the website.
+To avoid unauthorized snooping on your neighborhood, you will want to restrict access to the CommunityView website.  You can do this easily using *Basic Authentication* to set a user name and password pair that a user will have to supply before being able to view the website.
 
 Log into your DreamHost Web Panel account and perform the following steps:
 
 1. In the `Main Menu` column on the left side of the page, scroll down to the `Goodies` section and click on `Htaccess/WebDAV`.
 
-2. On the `Htaccess/WebDAV` page, click on the URL containing the domain that you established for your Surveillance website in Section 1, above.  The URL may show a "www" preceding the domain name.  Our example domain name might look like this:
+2. On the `Htaccess/WebDAV` page, click on the URL containing the domain that you established for your CommunityView website in Section 1, above.  The URL may show a "www" preceding the domain name.  Our example domain name might look like this:
 
 		http://www.cameras.my_neighborhood.org/
 
@@ -165,7 +165,7 @@ Log into your DreamHost Web Panel account and perform the following steps:
 
 1. Under `User accounts for this area`, there is a multi-line entry field into which you can enter user name and password pairs.  You can enter multiple user name and password combinations that you can give to people whom you would like to have access to the website.  
 
-	These user names and passwords have nothing to do with the account names(s) and password(s) you use to access your DreamHost server via FTP, shell, Web Panel, etc.  They are strictly to allow people to access to your Surveillance website.
+	These user names and passwords have nothing to do with the account names(s) and password(s) you use to access your DreamHost server via FTP, shell, Web Panel, etc.  They are strictly to allow people to access to your CommunityView website.
 
 	For example, if you had a group of neighbors who are responsible for reviewing the images when an incident occurs, and a private patrol service to whom you would also like give access, you might want to give each group a separate user name and password.  Say you assign the first group the user name "neighbors" with a password of "blue," and the patrol service a user name of "patrol" with a password of "red."  The the entry field would look like this:
 
@@ -180,7 +180,7 @@ Log into your DreamHost Web Panel account and perform the following steps:
 
 ### 9. Final Steps
 
-By now you should have received an email from DreamHost with the message, "starting python," from the work you did in Section 7.  This will likely be followed by a number of emails saying "python already running."  When you are satisfied that the restart script is being run regularly, and the Surveillance software is working correctly, you can turn the emails off by returning to the Cron Jobs page (Web Panel->Main Menu->Goodies->Cron Jobs) and following these steps:
+By now you should have received an email from DreamHost with the message, "starting python," from the work you did in Section 7.  This will likely be followed by a number of emails saying "python already running."  When you are satisfied that the restart script is being run regularly, and the CommunityView software is working correctly, you can turn the emails off by returning to the Cron Jobs page (Web Panel->Main Menu->Goodies->Cron Jobs) and following these steps:
 
 1. Click the `Edit` button for your cron job under the `Actions` column. 
 
@@ -188,4 +188,4 @@ By now you should have received an email from DreamHost with the message, "start
 
 1. Click the `Edit` button at the bottom of the page.
 
-If you are having difficulty setting up your Surveillance website and are a member of Neighborhood Guard, please contact the Neighborhood Guard technical support team directly.
+If you are having difficulty setting up your CommunityView website and are a member of Neighborhood Guard, please contact the Neighborhood Guard technical support team directly.
