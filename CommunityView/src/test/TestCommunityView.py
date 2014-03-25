@@ -3,25 +3,25 @@
 # Copyright (C) 2014 Neighborhood Guard, Inc.  All rights reserved.
 # Original author: Douglas Kerr
 # 
-# This file is part of Surveillance.
+# This file is part of CommunityView.
 # 
-# Surveillance is free software: you can redistribute it and/or modify
+# CommunityView is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 # 
-# Surveillance is distributed in the hope that it will be useful,
+# CommunityView is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU Affero General Public License for more details.
 # 
 # You should have received a copy of the GNU Affero General Public License
-# along with Surveillance.  If not, see <http://www.gnu.org/licenses/>.
+# along with CommunityView.  If not, see <http://www.gnu.org/licenses/>.
 #
 ################################################################################
 
 import unittest
-import surveillance
+import communityview
 import testsettings
 import time
 import threading
@@ -31,7 +31,7 @@ import shutil
 import inspect
 import datetime
 
-moduleUnderTest = surveillance
+moduleUnderTest = communityview
 
 class ForceDate(datetime.date):
     """Force datetime.date.today() to return a specifiable date for testing
@@ -92,7 +92,7 @@ class SleepHook():
         
 def deleteTestFiles():
     """Initialize the directory on the local machine that will simulate the
-    top-level directory of the Surveillance website (and is also used as the
+    top-level directory of the CommunityView website (and is also used as the
     top directory for incoming images.
     """
     shutil.rmtree(moduleUnderTest.root, False, None)
@@ -230,12 +230,12 @@ class TestSurveilleance(unittest.TestCase):
 
         if moduleUnderTest.set_up_logging.not_done:
             try:
-                os.remove("surveillance.log")
+                os.remove("communityview.log")
             except:
                 pass
         moduleUnderTest.set_up_logging()
         
-        # Set up the testing values for the surveillance global vars
+        # Set up the testing values for the communityview global vars
         #
         moduleUnderTest.cameras = testsettings.cameras
         moduleUnderTest.root = testsettings.root
@@ -382,8 +382,8 @@ class TestSurveilleance(unittest.TestCase):
 
     def terminateTestRun(self,seconds):
         if threading.currentThread().name == "MainThread":
-            self.waitForThreads()   # wait for surveillance to complete current tasks
-            # if we've had a pass through surveillance's main loop without
+            self.waitForThreads()   # wait for communityview to complete current tasks
+            # if we've had a pass through communityview's main loop without
             # finding any work to do, set the terminate flag and return
             if moduleUnderTest.images_to_process == False \
                     and moduleUnderTest.files_to_purge == False:

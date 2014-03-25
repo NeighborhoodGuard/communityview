@@ -1,12 +1,11 @@
-# Release Notes for Surveillance
+# Release Notes for CommunityView #
 
-## v0.9.3 - 2014/02/18
+## v0.9.4 - 2014/03/24 ##
 _Doug Kerr_
 
 ### Changes
 
-* Fix bug causing thumbnails and medium-resolution images not to be generated for some images.
-* Fix bug introduced in v0.9.2 causing `Previous day` and `Next day` links in day pages to be grayed out or point to wrong day page.
+* Change name to CommunityView.
 
 ### Known Issues
 
@@ -17,6 +16,14 @@ _Doug Kerr_
 * Move sequence-page navigation to top of page.
 * Add UI link to source code.
 * Add graceful shutdown.
+
+## v0.9.3 - 2014/02/18 ##
+_Doug Kerr_
+
+### Changes
+
+* Fix bug causing thumbnails and medium-resolution images not to be generated for some images.
+* Fix bug introduced in v0.9.2 causing `Previous day` and `Next day` links in day pages to be grayed out or point to wrong day page.
 
 ## v0.9.2 - 2014/02/06
 _Doug Kerr_
