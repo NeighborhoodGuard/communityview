@@ -1,6 +1,6 @@
 ## Installing Neighborhood Guard's CommunityView Software ##
 
-_Note: These instructions are tailored to using DreamHost as the hosting service, as this has been our platform to date. Sites hosted by other services will vary in the details, particularly in the areas of creating a domain for the Web server, setting up Basic Authentication, and crontab entries._
+_Note: These instructions are tailored to using DreamHost as the hosting service, as this has been our platform of choice to date. Sites hosted by other services will vary in the details, particularly in the areas of creating a domain for the Web server, setting up Basic Authentication, python functionality and crontab entries._
 
 ### Prerequisites 
 
@@ -23,13 +23,13 @@ These instructions assume you have the following:
 
 ### 1. Create a Domain for the CommunityView Website
 
-When users navigate to this domain in  a browser, they will see the home (top-level) page of the website that the CommunityView software creates.  In these instructions, the example domain name we will use is 	`cameras.my_neighborhood.org`.  Users will therefore point their browsers to `http://cameras.my_neighborhood.org` to see the website built by the CommunityView software.
+When users navigate to this domain in  a browser, they will see the home (top-level) page of the website that the CommunityView software creates.  In these instructions, the example domain name we will use is 	`communityview.my_neighborhood.org`.  Users will therefore point their browsers to `http://communityview.my_neighborhood.org` to see the website built by the CommunityView software.
 
 1. Log into your DreamHost Web Panel account,  and in the `Main Menu` navigation panel on the left, under `Domains` click on `Manage Domains`.
 
 1. On the Manage Domains page, click on `Add New Domain / Sub-Domain`.
 
-1. On the page that follows, under `Domain Name`, fill in the `Domain to host` field with the name of your new domain, `cameras.my_neighborhood.org` in our example.
+1. On the page that follows, under `Domain Name`, fill in the `Domain to host` field with the name of your new domain, `communityview.my_neighborhood.org` in our example.
 
 1. We recommend clicking `Remove WWW`, but this is optional.
 
@@ -37,11 +37,11 @@ When users navigate to this domain in  a browser, they will see the home (top-le
 
 1. Leave all the remaining options set to their defaults, and click the button entitiled `Fully host this domain`.
 
-This will establish your domain and create a directory by the same name under the home directory of your user account.  In our example, this directory would be `/home/nguser/cameras.my_neighborhood.org`.
+This will establish your domain and create a directory by the same name under the home directory of your user account.  In our example, this directory would be `/home/nguser/communityview.my_neighborhood.org`.
 
 ### 2. Create a Directory for the CommunityView Code
 
-Create a directory directly underneath the directory you created in the previous section for the CommunityView website.  Conventionally, we call this directory `communityview`, so following our example, you would create a directory with the following path, `/home/nguser/cameras.my_neighborhood.org/communityview`.  You can do this via either FTP from you local machine, or via shell command on the server.
+Create a directory directly underneath the directory you created in the previous section for the CommunityView website.  Conventionally, we call this directory `communityview` (all lower case), so following our example, you would create a directory with the following path, `/home/nguser/communityview.my_neighborhood.org/communityview`.  You can do this via either FTP from you local machine, or via shell command on the server.
 
 ### 3. Get the Latest CommunityView Source Code From GitHub
 
@@ -81,22 +81,22 @@ There are two required values in each camera object, the `shortname` and the `lo
 >*date*/*location*/*image_name*.jpg
 > 
 
-The `shortname` is the name of the _location_ directory that the IP camera creates when it uploads an image.  This is configured in the IP camera by the person setting up the camera.  Conventionally we use this to indicate the location of the camera, e.g., `1234Main` for a camera located at 1234 Main St.  The `longname` is a more human-readable form of the location that will be displayed on the CommunityView Web pages, e.g., "1234 Main St."
+The `shortname` is the casesensitive name of the _location_ directory that the IP camera creates when it uploads an image. It is convention to user all lowercase letters for the `shortname`. The `shortname` is configured in the IP camera by the person setting up the camera.  Conventionally we use this to indicate the location of the camera, e.g., `1234main` for a camera located at 1234 Main St.  The `longname` is a more human-readable form of the location that will be displayed on the CommunityView Web pages, e.g., "1234 Main St."
 
 Continuing with this example location, the `cameras` list for a camera at this location, plus another at 500 West Ave. would look like:
 
 	cameras = [   
-		camera("1234Main", "1234 Main St."),
-		camera("500West", "500 West Ave."),
+		camera("1234main", "1234 Main St."),
+		camera("500west", "500 West Ave."),
 		]
 
 Note that there is one line for each camera, and that there is a comma at the end of each line.
 
 #### The `root` Directory
 
-The `root` variable tells the CommunityView code where the "root," or top level of the directory tree is into which the image files will be uploaded.  Set this to be the directory you established in Section 1 as the top-level directory for the CommunityView website.  In our example above, this is `/home/nguser/cameras.my_neigborhood.org`, so the example variable assignment would look like,
+The `root` variable tells the CommunityView code where the "root," or top level of the directory tree is into which the image files will be uploaded.  Set this to be the directory you established in Section 1 as the top-level directory for the CommunityView website.  In our example above, this is `/home/nguser/communityview.my_neigborhood.org`, so the example variable assignment would look like,
 
-	root = "/home/nguser/cameras.my_neigborhood.org"
+	root = "/home/nguser/communityview.my_neigborhood.org"
 
 
 ### 5. Edit `check_video_restart.bash`
@@ -109,7 +109,7 @@ The only change that needs to be made to this script is to configure that path t
 
 so that the path points to the `communityview` directory you created in Section 2, above.  Using our example values, the line would  look like this:
 
-	cd /home/nguser/cameras.my_neighborhood.org/communityview
+	cd /home/nguser/communityview.my_neighborhood.org/communityview
 
 Now that the required changes have been made, you can copy the source code to the Web server.
 
@@ -135,7 +135,7 @@ Log into your DreamHost Web Panel account and perform the following steps:
 
 1. In the `Command to run` field, enter `/bin/bash` followed by a space and the full path name of the restart script.  Using our example values, the entry would look like this:
 
-		/bin/bash /home/nguser/cameras.my_neighborhood.org/communityview/check_video_restart.bash
+		/bin/bash /home/nguser/communityview.my_neighborhood.org/communityview/check_video_restart.bash
 
 1. Uncheck the `Use locking` checkbox.
 
@@ -153,7 +153,7 @@ Log into your DreamHost Web Panel account and perform the following steps:
 
 2. On the `Htaccess/WebDAV` page, click on the URL containing the domain that you established for your CommunityView website in Section 1, above.  The URL may show a "www" preceding the domain name.  Our example domain name might look like this:
 
-		http://www.cameras.my_neighborhood.org/
+		http://www.communityview.my_neighborhood.org/
 
 1. On the next page, leave the `Directory name` entry field blank, as you will be password protecting the entire website, not just a sub-directory.
 
@@ -161,7 +161,7 @@ Log into your DreamHost Web Panel account and perform the following steps:
 
 1. Leave the `Enable WebDav on this dir?` checkbox unchecked.
 
-1. The text you enter into the `Directory "name"` field will appear in the browser pop-up that will ask users for their user name and password.  You can enter a short name or statement of your choice here, for example, "Neighborhood Camera Committee Only."
+1. The text you enter into the `Directory "name"` field will appear in the browser pop-up that will ask users for their user name and password.  You can enter a short name or statement of your choice here, for example, "Neighborhood Crime Committee Only."
 
 1. Under `User accounts for this area`, there is a multi-line entry field into which you can enter user name and password pairs.  You can enter multiple user name and password combinations that you can give to people whom you would like to have access to the website.  
 
