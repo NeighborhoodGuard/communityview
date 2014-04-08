@@ -81,7 +81,7 @@ There are two required values in each camera object, the `shortname` and the `lo
 >*date*/*location*/*image_name*.jpg
 > 
 
-The `shortname` is the casesensitive name of the _location_ directory that the IP camera creates when it uploads an image. It is convention to user all lowercase letters for the `shortname`. The `shortname` is configured in the IP camera by the person setting up the camera.  Conventionally we use this to indicate the location of the camera, e.g., `1234main` for a camera located at 1234 Main St.  The `longname` is a more human-readable form of the location that will be displayed on the CommunityView Web pages, e.g., "1234 Main St."
+The `shortname` is the case-sensitive name of the _location_ directory that the IP camera creates when it uploads an image. It is convention to use all lowercase letters for the `shortname`. The `shortname` is configured in the IP camera by the person setting up the camera.  Conventionally we use this to indicate the location of the camera, e.g., `1234main` for a camera located at 1234 Main St.  The `longname` is a more human-readable form of the location that will be displayed on the CommunityView Web pages, e.g., "1234 Main St."
 
 Continuing with this example location, the `cameras` list for a camera at this location, plus another at 500 West Ave. would look like:
 
