@@ -186,16 +186,17 @@ def processImage(indir, filename, cam, master_image=None):
                 del img     # close img
 
             if cropped_img == None:
-                logging.error("Failed to crop image %s, croparea: %s" % (infilepathfilename, str(cam.croparea)))
                 # crop failure is likely due to attempting to process the
                 # incoming image while it is still being uploaded. Return from
                 # processImage() here and leave image in incoming dir--don't
-                # mark it "done" by moving it to the hires dir. When we get
+                # mark it "done" by moving it to the hires dir. 
+                # Just log this as a warning, not an error.  When we get
                 # around to processing this image again, it will probably work
                 # correctly.  However, if the image mod time is more than an
                 # hour old, it's not likely to still be uploading, so assume
                 # it's just broken and let the normal code move it to hires
                 # so we don't try to process it again
+                logging.warn("Failed to crop image %s, croparea: %s" % (infilepathfilename, str(cam.croparea)))
                 if os.path.getmtime(infilepathfilename) >= (time.time() - 3600):
                     logging.info("Returning from processImage()" \
                                  + ", leaving original image in place")
@@ -227,9 +228,15 @@ def processImage(indir, filename, cam, master_image=None):
     
       
         # done processing, move raw file to storage, so we won't process it again.
+        #
         infilepathfilename = inpath(indir, filename)
         hirespathfilename = hirespath(indir, filename)
         
+        # if this is a file we can't crop, we're now giving up on ever being
+        # able to crop it by moving it to hires.  Log as an error
+        if cropped_img == None:
+            logging.error("Failed to crop image; moving to hires: %s" % infilepathfilename);
+            
         shutil.move(infilepathfilename,hirespathfilename)
     except Exception, e:
         logging.error("Unexpected exception in processImage()")
