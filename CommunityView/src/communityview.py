@@ -151,8 +151,10 @@ def crop_image(img, croparea):
     try:
         cropped_image = img.crop((topleft_x, topleft_y, lowerright_x, lowerright_y))
     except IOError:
-        logging.error("crop_image: Can't crop. Img size: (%d, %d); crop area topleft: (%d, %d), lowerright (%d, %d)" \
-                      % (size_x, size_y, topleft_x, topleft_y, lowerright_x, lowerright_y))
+        logging.debug("crop_image: Can't crop. Img size: (%d, %d); crop area" \
+                       "topleft: (%d, %d), lowerright (%d, %d)" \
+                      % (size_x, size_y, topleft_x, topleft_y, 
+                         lowerright_x, lowerright_y))
         cropped_image = None
 
     return cropped_image
