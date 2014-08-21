@@ -727,6 +727,12 @@ def isdir_today(indir):
 
     return (processingyear==current.year and processingmonth == current.month and processingday==current.day)
 
+# keep track of what daydir processtoday() is working on in this var.
+# Set before processtoday_thread starts and cleared after it terminates.
+# We do this so that process_previous_days() can insure that it does not
+# start to work on a daydir that processtoday() is still working on
+#
+processtoday_daydir = ""
 
 def process_previous_days(daydirs):
     logging.info("Starting process_previous_days()")
@@ -734,6 +740,10 @@ def process_previous_days(daydirs):
         if len(daydirs) > 0:
             start = 1 if isdir_today(daydirs[0]) else 0
             for day_index in range(start, len(daydirs)):
+                if daydirs[day_index]==processtoday_daydir:
+                    logging.info("process_previous_days() skipping "
+                                 + processtoday_daydir)
+                    continue
                 process_day(daydirs, day_index)
     except Exception, e:
         logging.error("Unexpected exception in process_previous_days()")
@@ -849,6 +859,7 @@ def main():
     
     global images_to_process
     global files_to_purge
+    global processtoday_daydir
     
     set_up_logging()
     logging.info("Program Started, version %s", version_string)
@@ -879,11 +890,15 @@ def main():
     
             make_day_list_html(daydirs)
                     
+            # track which daydir processtoday() is working on
+            if not processtoday_thread.is_alive():
+                processtoday_daydir = ""
+            
             # Today runs in 1 thread, all previous days are handled in 1 thread 
             # starting with most recent day and working backwards.
-                
             if len(daydirs) > 0 and isdir_today(daydirs[0]):
                 if not processtoday_thread.is_alive():
+                    processtoday_daydir = daydirs[0] # track which day we're on
                     processtoday_thread = threading.Thread(target=processtoday, args=(daydirs,))
                     processtoday_thread.start()
     
