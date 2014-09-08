@@ -59,29 +59,33 @@ class TestStats(unittest.TestCase):
         """Call proc_stats() nfiles times with the given datecam and file name 
         prefix (e.g., "12-01-00"), also passing it an appropriate mtime and 
         manipulating the return value of time.time() to represent the specified
-        upload latency and processing latency in minutes."""
+        upload latency and processing latency in minutes.
+        Return the timestamp used as "now"."""
         date_dt = dirname_to_datetime(datecam[0])
         for i in range(nfiles):
             fn = fnprefix + "-%05d.jpg" % (i+1)
             mtime = time.mktime((date_dt + filename_to_time(fn)).timetuple()) \
                     + uplat * 60
-            MockTime.set_time(float(mtime + proclat * 60))
+            test_now = float(mtime + proclat * 60)
+            MockTime.set_time(test_now)
             stats.proc_stats(datecam, fn, mtime)
             MockTime.restore_time()
+        return test_now
     
     def test000proc_stats(self):
         datecam = ("2014-07-01", "cam1")
         fnprefix = "00-01-00"
         nfiles = 5
         uplat = 24*60+4
-        proclat = 10
-        self.call_proc_stats(datecam, fnprefix, nfiles, uplat, proclat)
+        proclat = 6
+        test_now = self.call_proc_stats(datecam, fnprefix, nfiles, uplat, 
+                                        proclat)
 
         keys = stats.statdict.keys()
         for k in keys:
             print str(k)
             table = stats.statdict[k][stats.TABLE]
-            for i in range(7):
+            for i in range(12):
                 print table[i]
             print
         
@@ -103,6 +107,14 @@ class TestStats(unittest.TestCase):
                 % (proclat_table[proclat_row][stats.NPROC], nfiles)
         assert proclat_table[proclat_row][stats.AVGPROCLAT] == proclat,"%d, %d"\
                 % (proclat_table[proclat_row][stats.AVGPROCLAT], proclat)
+                
+        # count of files processed during the minute the test considers as "now"
+        now_tm = time.localtime(test_now)
+        now_datecam = (time.strftime("%Y-%m-%d", now_tm), datecam[1])
+        now_table = stats.statdict[now_datecam][stats.TABLE]
+        now_row = now_tm.tm_hour*60 + now_tm.tm_min
+        assert now_table[now_row][stats.NPROCNOW] == nfiles, "%d, %d" \
+                % (now_table[now_row][stats.NPROCNOW], nfiles)
         
 
 if __name__ == "__main__":

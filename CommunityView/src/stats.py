@@ -48,8 +48,9 @@ NUPLOAD     = 0     # number of images uploaded during this minute
 AVGUPLAT    = 1     # average upload latency during this minute
 NPROC       = 2     # number of uploads processed during this minute
 AVGPROCLAT  = 3     # average processing latency during this minute
+NPROCNOW    = 4     # number of files processed during this minute
 
-LENDCROW = 4    # 
+LENDCROW    = 5     # length of the table row
 
 # the number of rows in the datacam csv table is equal to the number of minutes
 # in a day
@@ -117,13 +118,23 @@ def proc_stats(datecam, filename, mtime):
     # on the server, which is indicated by the mod time of the file.
     now = time.time()
     proclat = (int(now) - int(mtime))/60
-    mtimedt = datetime.datetime.fromtimestamp(mtime)
-    procdatecam = ("%d-%02d-%02d" % (mtimedt.year, mtimedt.month, mtimedt.day),
-                   datecam[1])
-    procminute = mtimedt.hour*60 + mtimedt.minute
+    mtime_tm = time.localtime(mtime)
+    procdatecam = (time.strftime("%Y-%m-%d", mtime_tm), datecam[1])
+    procminute = mtime_tm.tm_hour*60 + mtime_tm.tm_min
     
     (lock, table) = lock_datecam(procdatecam)
     row = table[procminute]
     row[AVGPROCLAT] = (row[AVGPROCLAT] * row[NPROC] + proclat) / (row[NPROC]+1)
     row[NPROC] += 1
     lock.release()
+    
+    # the record the number of images processed this minute
+    now_tm = time.localtime(now)
+    nowdatecam = (time.strftime("%Y-%m-%d", now_tm), datecam[1])
+    now_minute = now_tm.tm_hour*60 + now_tm.tm_min
+    
+    (lock, table) = lock_datecam(nowdatecam)
+    table[now_minute][NPROCNOW] += 1
+    lock.release()
+    
+    
