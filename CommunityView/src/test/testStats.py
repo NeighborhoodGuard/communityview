@@ -48,9 +48,13 @@ class TestStats(unittest.TestCase):
 
     def setUp(self):
         stats.incrootpath = testsettings.incrootpath
-        statspath = os.path.join(stats.incrootpath, "stats")
-        if not os.path.isdir(statspath):
-            os.makedirs(statspath)
+        stats.lwebrootpath = testsettings.lwebrootpath
+        stats.statspath = os.path.join(stats.lwebrootpath, "stats")
+        if not os.path.isdir(stats.statspath):
+            os.makedirs(stats.statspath)
+        for f in os.listdir(stats.statspath):
+            os.remove(os.path.join(stats.statspath, f))
+            
         
     def tearDown(self):
         pass
@@ -92,8 +96,8 @@ class TestStats(unittest.TestCase):
         # upload latency statistics
         uplat_table = stats.statdict[datecam][stats.TABLE]
         uplat_row = filename_to_time(fnprefix).seconds/60
-        assert uplat_table[uplat_row][stats.NUPLOAD] == nfiles, "%d, %d" \
-                % (uplat_table[uplat_row][stats.NUPLOAD], nfiles)
+        assert uplat_table[uplat_row][stats.NCREATE] == nfiles, "%d, %d" \
+                % (uplat_table[uplat_row][stats.NCREATE], nfiles)
         assert uplat_table[uplat_row][stats.AVGUPLAT] == uplat, "%d, %d" \
                 % (uplat_table[uplat_row][stats.AVGUPLAT], uplat)
                     
@@ -103,8 +107,8 @@ class TestStats(unittest.TestCase):
                          .strftime("%Y-%m-%d")
         proclat_table = stats.statdict[(upload_date, datecam[1])][stats.TABLE]
         proclat_row = uplat_row + uplat_td.seconds/60   # strip uplat days
-        assert proclat_table[proclat_row][stats.NPROC] == nfiles, "%d, %d" \
-                % (proclat_table[proclat_row][stats.NPROC], nfiles)
+        assert proclat_table[proclat_row][stats.NUPPROC] == nfiles, "%d, %d" \
+                % (proclat_table[proclat_row][stats.NUPPROC], nfiles)
         assert proclat_table[proclat_row][stats.AVGPROCLAT] == proclat,"%d, %d"\
                 % (proclat_table[proclat_row][stats.AVGPROCLAT], proclat)
                 
@@ -116,6 +120,13 @@ class TestStats(unittest.TestCase):
         assert now_table[now_row][stats.NPROCNOW] == nfiles, "%d, %d" \
                 % (now_table[now_row][stats.NPROCNOW], nfiles)
         
+    def test010writestatsfile(self):
+        # DEPENDS ON RUNNING PREVIOUS TEST
+        datecam = ("2014-07-01", "cam1")
+        stats.write_dctable(datecam)
+        datecam = ("2014-07-02", "cam1")
+        stats.write_dctable(datecam)
+
 
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testStats']
