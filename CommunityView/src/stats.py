@@ -49,12 +49,11 @@ TABLE = 1
 
 # datecam table column indicies
 NCREATE     = 0 # number of uploaded images that were created during this minute
-NUPPROC     = 1 # number of imgs processed that were uploaded during this minute
-NPROCNOW    = 2 # number of files processed during this minute
-NUNPROCNOW  = 3 # number of unprocessed files remaining at this minute
-DCFLOATS    = 4 # first column of floating point numbers
-AVGUPLAT    = 4 # average upload latency for images created during this minute
-AVGPROCLAT  = 5 # avg processing latency for images uploaded during this minute
+AVGUPLAT    = 1 # average upload latency for images created during this minute
+NUPLOAD     = 2 # number of imgs processed that were uploaded during this minute
+AVGPROCLAT  = 3 # avg processing latency for images uploaded during this minute
+NPROCNOW    = 4 # number of files processed during this minute
+NUNPROCNOW  = 5 # number of unprocessed files remaining at this minute
 
 LENDCROW    = 6 # length of the datecam table row
 
@@ -76,6 +75,15 @@ def datecam_to_fn(datecam):
     """Return the filename of the stats file associated with the datecam."""
     return datecam[0] + "_" + datecam[1] + ".csv"
 
+def number(string):
+    """Convert numeric string str to a float or an int depending on its
+    contents.  If string is an empty string or None, return None."""
+    if not str:
+        return None
+    try:
+        return int(str)
+    except ValueError:
+        return float(str)
 
 def lock_datecam(datecam):
     """Insure the stats table for the datecam is in memory, and return a tuple
@@ -86,8 +94,6 @@ def lock_datecam(datecam):
     if datecam not in statdict:
         # begin with an empty table
         trow = [None] * LENDCROW
-        trow[0:DCFLOATS] = [0] * DCFLOATS
-        trow[DCFLOATS:] = [0.0] * (LENDCROW-DCFLOATS)
         table = [None] * MINPERDAY  # initialization optimization
         table = [list(trow) for _ in range(MINPERDAY)]
         statdict[datecam] = [threading.RLock(), table]
@@ -110,8 +116,7 @@ def lock_datecam(datecam):
                                 % (fp, rindex+1))
                     trow = table[rindex]
                     csvrow = csvrow[1:]     # remove the time field
-                    trow[0:DCFLOATS] = [int(i) for i in csvrow[0:DCFLOATS]]
-                    trow[DCFLOATS:] = [float(f) for f in csvrow[DCFLOATS:]]
+                    trow = [number(s) for s in csvrow]
                     rindex += 1
             if rindex != MINPERDAY:
                 raise StatsError("%s: wrong number of data rows: %d" \
@@ -136,14 +141,16 @@ def proc_stats(datecam, filename, mtime):
     uplat = uplatdelta.days*24*60 + float(uplatdelta.seconds)/60
         
     (lock, table) = lock_datecam(datecam)        
-    row = table[fnminute]    
-    nupload = int(row[NCREATE])
-    row[AVGUPLAT] = (row[AVGUPLAT] * nupload + uplat) / (nupload + 1)
-    row[NCREATE] = nupload + 1
+    row = table[fnminute]
+    if row[NCREATE] is None:
+        row[NCREATE] = 0
+        row[AVGUPLAT] = 0.0
+    row[AVGUPLAT] = (row[AVGUPLAT] * row[NCREATE] + uplat) / (row[NCREATE] + 1)
+    row[NCREATE] += 1
     lock.release()
     
     # the processing latency is recorded with respect the time the image arrived
-    # on the server, which is indicated by the mod time of the file.
+    # on the server, which is indicated by the modification time of the file.
     now = time.time()
     proclat = (now - mtime)/60
     mtime_tm = time.localtime(mtime)
@@ -152,18 +159,23 @@ def proc_stats(datecam, filename, mtime):
     
     (lock, table) = lock_datecam(procdatecam)
     row = table[procminute]
-    row[AVGPROCLAT] = (row[AVGPROCLAT] * row[NUPPROC] + proclat) \
-                        / (row[NUPPROC] + 1)
-    row[NUPPROC] += 1
+    if row[NUPLOAD] is None:
+        row[NUPLOAD] = 0
+        row[AVGPROCLAT] = 0.0
+    row[AVGPROCLAT] = (row[AVGPROCLAT] * row[NUPLOAD] + proclat) \
+                        / (row[NUPLOAD] + 1)
+    row[NUPLOAD] += 1
     lock.release()
     
     # the record the number of images processed this minute
     now_tm = time.localtime(now)
     nowdatecam = (time.strftime("%Y-%m-%d", now_tm), datecam[1])
-    now_minute = now_tm.tm_hour*60 + now_tm.tm_min
+    nowminute = now_tm.tm_hour*60 + now_tm.tm_min
     
     (lock, table) = lock_datecam(nowdatecam)
-    table[now_minute][NPROCNOW] += 1
+    if table[nowminute][NPROCNOW] is None:
+        table[nowminute][NPROCNOW] = 0
+    table[nowminute][NPROCNOW] += 1
     lock.release()
 
 def write_dctable(datecam):
@@ -187,20 +199,32 @@ def write_dctable(datecam):
     os.rename(fp, os.path.join(statspath, datecam_to_fn(datecam)))
     statdict[datecam][LOCK].release()
     
-def minute_stats():
+def minute_stats(timestamp, cameras):
     # get count of unprocessed images for previous days and today
     # write each changed stats table out to the filesystem
     # write the stats page html
+    ts_tm = time.localtime(timestamp)
+    date = time.strftime("%Y-%m-%d", ts_tm)
+    minute = ts_tm.tm_hour*60 + ts_tm.tm_min
+    for cam in cameras:
+        datecam = (date, cam.shortname)
+        dcpath = os.path.join(incrootpath, date, cam.shortname)
+        l = os.listdir(dcpath)  # should just get jpgs, but this is lower impact
+        (lock, table) = lock_datecam(datecam)
+        table[minute][NUNPROCNOW] = len(l)
+        lock.release()
+        
     for k in statdict.keys():
-        if isinstance(k, tuple):    # if datecam, not server date
+        if isinstance(k, tuple):    # if k is a datecam, not a server date
             write_dctable(k)
             
     
-def stats_thread():
-    """Called by stats thread to run the per-minute stats processing."""
+def stats_thread(cameras):
+    """Called by stats thread to run the per-minute stats processing.  Cameras
+    is the list of camera objects."""
     while True:
         ts = time.time()
         time.sleep(60 - ts%60)
-        minute_stats()
+        minute_stats(time.time(), cameras)
 
     

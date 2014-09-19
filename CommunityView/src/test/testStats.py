@@ -107,8 +107,8 @@ class TestStats(unittest.TestCase):
                          .strftime("%Y-%m-%d")
         proclat_table = stats.statdict[(upload_date, datecam[1])][stats.TABLE]
         proclat_row = uplat_row + uplat_td.seconds/60   # strip uplat days
-        assert proclat_table[proclat_row][stats.NUPPROC] == nfiles, "%d, %d" \
-                % (proclat_table[proclat_row][stats.NUPPROC], nfiles)
+        assert proclat_table[proclat_row][stats.NUPLOAD] == nfiles, "%d, %d" \
+                % (proclat_table[proclat_row][stats.NUPLOAD], nfiles)
         assert proclat_table[proclat_row][stats.AVGPROCLAT] == proclat,"%d, %d"\
                 % (proclat_table[proclat_row][stats.AVGPROCLAT], proclat)
                 
