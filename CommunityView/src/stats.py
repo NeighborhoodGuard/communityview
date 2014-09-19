@@ -52,8 +52,8 @@ NCREATE     = 0 # number of uploaded images that were created during this minute
 AVGUPLAT    = 1 # average upload latency for images created during this minute
 NUPLOAD     = 2 # number of imgs processed that were uploaded during this minute
 AVGPROCLAT  = 3 # avg processing latency for images uploaded during this minute
-NPROCNOW    = 4 # number of files processed during this minute
-NUNPROCNOW  = 5 # number of unprocessed files remaining at this minute
+NPROC       = 4 # number of files processed during this minute
+NUNPROC     = 5 # number of unprocessed files remaining at this minute
 
 LENDCROW    = 6 # length of the datecam table row
 
@@ -133,7 +133,7 @@ def proc_stats(datecam, filename, mtime):
     (yr, mo, day) = dir2date(datecam[0])
     (hr, minute, sec) = file2time(filename)
     fndt = datetime.datetime(yr, mo, day, hr, minute, sec)
-    fnminute = hr*60 + minute
+    createminute = hr*60 + minute
     uplatdelta = datetime.datetime.fromtimestamp(mtime) - fndt
     if uplatdelta.days < 0 or uplatdelta.seconds < 0:
         raise StatsError("upload latency is negative: %s %s" % \
@@ -141,7 +141,7 @@ def proc_stats(datecam, filename, mtime):
     uplat = uplatdelta.days*24*60 + float(uplatdelta.seconds)/60
         
     (lock, table) = lock_datecam(datecam)        
-    row = table[fnminute]
+    row = table[createminute]
     if row[NCREATE] is None:
         row[NCREATE] = 0
         row[AVGUPLAT] = 0.0
@@ -149,16 +149,17 @@ def proc_stats(datecam, filename, mtime):
     row[NCREATE] += 1
     lock.release()
     
-    # the processing latency is recorded with respect the time the image arrived
-    # on the server, which is indicated by the modification time of the file.
+    # the processing latency is recorded with respect the time the image was
+    # uploaded to the server, which is indicated by the modification time of the
+    # file
     now = time.time()
     proclat = (now - mtime)/60
     mtime_tm = time.localtime(mtime)
-    procdatecam = (time.strftime("%Y-%m-%d", mtime_tm), datecam[1])
-    procminute = mtime_tm.tm_hour*60 + mtime_tm.tm_min
+    uploaddatecam = (time.strftime("%Y-%m-%d", mtime_tm), datecam[1])
+    uploadminute = mtime_tm.tm_hour*60 + mtime_tm.tm_min
     
-    (lock, table) = lock_datecam(procdatecam)
-    row = table[procminute]
+    (lock, table) = lock_datecam(uploaddatecam)
+    row = table[uploadminute]
     if row[NUPLOAD] is None:
         row[NUPLOAD] = 0
         row[AVGPROCLAT] = 0.0
@@ -173,9 +174,9 @@ def proc_stats(datecam, filename, mtime):
     nowminute = now_tm.tm_hour*60 + now_tm.tm_min
     
     (lock, table) = lock_datecam(nowdatecam)
-    if table[nowminute][NPROCNOW] is None:
-        table[nowminute][NPROCNOW] = 0
-    table[nowminute][NPROCNOW] += 1
+    if table[nowminute][NPROC] is None:
+        table[nowminute][NPROC] = 0
+    table[nowminute][NPROC] += 1
     lock.release()
 
 def write_dctable(datecam):
@@ -209,9 +210,10 @@ def minute_stats(timestamp, cameras):
     for cam in cameras:
         datecam = (date, cam.shortname)
         dcpath = os.path.join(incrootpath, date, cam.shortname)
-        l = os.listdir(dcpath)  # should just get jpgs, but this is lower impact
+        # should just count jpegs, here, but this is lower impact
+        n = len(os.listdir(dcpath))
         (lock, table) = lock_datecam(datecam)
-        table[minute][NUNPROCNOW] = len(l)
+        table[minute][NUNPROC] = n
         lock.release()
         
     for k in statdict.keys():

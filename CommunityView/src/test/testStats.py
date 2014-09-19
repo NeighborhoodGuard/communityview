@@ -117,8 +117,8 @@ class TestStats(unittest.TestCase):
         now_datecam = (time.strftime("%Y-%m-%d", now_tm), datecam[1])
         now_table = stats.statdict[now_datecam][stats.TABLE]
         now_row = now_tm.tm_hour*60 + now_tm.tm_min
-        assert now_table[now_row][stats.NPROCNOW] == nfiles, "%d, %d" \
-                % (now_table[now_row][stats.NPROCNOW], nfiles)
+        assert now_table[now_row][stats.NPROC] == nfiles, "%d, %d" \
+                % (now_table[now_row][stats.NPROC], nfiles)
         
     def test010writestatsfile(self):
         # DEPENDS ON RUNNING PREVIOUS TEST
