@@ -120,13 +120,35 @@ class TestStats(unittest.TestCase):
         assert now_table[now_row][stats.NPROC] == nfiles, "%d, %d" \
                 % (now_table[now_row][stats.NPROC], nfiles)
         
-    def test010writestatsfile(self):
+    def test010writereadstatsfile(self):
         # DEPENDS ON RUNNING PREVIOUS TEST
-        datecam = ("2014-07-01", "cam1")
-        stats.write_dctable(datecam)
-        datecam = ("2014-07-02", "cam1")
-        stats.write_dctable(datecam)
+        
+        # write tables out to filesystem
+        datecam1 = ("2014-07-01", "cam1")
+        stats.write_dctable(datecam1)
+        datecam2 = ("2014-07-02", "cam1")
+        stats.write_dctable(datecam2)
+        
+        # move the tables in memory to new keys so files can be read back in
+        # without disturbing the original tables
+        datecam1orig = ("2015-07-01", "cam1")
+        datecam2orig = ("2015-07-02", "cam1")
+        stats.statdict[datecam1orig] = stats.statdict[datecam1]
+        stats.statdict[datecam2orig] = stats.statdict[datecam2]
+        del stats.statdict[datecam1]
+        del stats.statdict[datecam2]
 
+        # read the files back into memory and compare with original tables
+        tests = ((datecam1, datecam1orig), (datecam2, datecam2orig))
+        for (new, orig) in tests:
+            (lock, newtable) = stats.lock_datecam(new)
+            lock.release()
+            origtable = stats.statdict[orig][stats.TABLE]
+            for row in range(stats.MINPERDAY):
+                if newtable[row] != origtable[row]:
+                    print "Row %d  new: %s" % (row, newtable[row])
+                    print "Row %d orig: %s" % (row, origtable[row])
+                    assert False
 
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testStats']

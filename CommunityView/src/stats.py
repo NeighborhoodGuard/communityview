@@ -7,7 +7,7 @@ import threading
 import os.path
 import csv
 import datetime
-from communityview import dir2date, file2time
+from communityview import dir2date, file2time, get_daydirs
 import time
 import logging
 
@@ -53,9 +53,16 @@ AVGUPLAT    = 1 # average upload latency for images created during this minute
 NUPLOAD     = 2 # number of imgs processed that were uploaded during this minute
 AVGPROCLAT  = 3 # avg processing latency for images uploaded during this minute
 NPROC       = 4 # number of files processed during this minute
-NUNPROC     = 5 # number of unprocessed files remaining at this minute
+NUNPROC     = 5 # number of unprocessed files from today at this minute
+NUNPROCPREV = 6 # number of unprocessed files from previous days at this minute
 
-LENDCROW    = 6 # length of the datecam table row
+LENDCROW    = 7 # length of the datecam table row
+
+# datecam CSV file column headers
+DCCSVHEADERS = ("Time", "Images Created/Min", "Upload Latency", 
+                "Images Uploaded/Min", "Processing Latency",
+                "Images Processed/Min", "Unprocessed Images", 
+                "Previous Days' Unprocessed Images")
 
 # per-server table in statdict:
 # same top level as datecam
@@ -76,20 +83,21 @@ def datecam_to_fn(datecam):
     return datecam[0] + "_" + datecam[1] + ".csv"
 
 def number(string):
-    """Convert numeric string str to a float or an int depending on its
+    """Convert numeric string to a float or an int depending on its
     contents.  If string is an empty string or None, return None."""
-    if not str:
+    if not string:
         return None
     try:
-        return int(str)
+        return int(string)
     except ValueError:
-        return float(str)
+        return float(string)
 
 def lock_datecam(datecam):
     """Insure the stats table for the datecam is in memory, and return a tuple
     consisting of an acquired RLock for accessing the table (which must be
     released when the thread is done accessing/updating the table) and the
-    table. If there is no existing table file, initialize table to all zeros."""
+    table. If there is no existing table file, initialize all table values to
+    None."""
     dictlock.acquire() 
     if datecam not in statdict:
         # begin with an empty table
@@ -114,9 +122,8 @@ def lock_datecam(datecam):
                     if len(csvrow) != LENDCROW+1:
                         raise StatsError("%s: line %d: wrong number of fields" \
                                 % (fp, rindex+1))
-                    trow = table[rindex]
                     csvrow = csvrow[1:]     # remove the time field
-                    trow = [number(s) for s in csvrow]
+                    table[rindex] = [number(s) for s in csvrow]
                     rindex += 1
             if rindex != MINPERDAY:
                 raise StatsError("%s: wrong number of data rows: %d" \
@@ -185,17 +192,13 @@ def write_dctable(datecam):
     statdict[datecam][LOCK].acquire()
     with open(fp, "wb") as csvfile:
         writer = csv.writer(csvfile, delimiter=',', quotechar='"')
-        
-        hdrrow = ["Time", "Images Created/Min", "Images Uploaded/Min", 
-                  "Images Processed/Min", "Unprocessed Images", 
-                  "Avg Upload Latency", "Avg Processing Latency"]
-        writer.writerow(hdrrow)
+        writer.writerow(DCCSVHEADERS)
         
         for m in range(MINPERDAY):
             trow = statdict[datecam][TABLE][m]
             csvrow = [None] * (LENDCROW + 1)
             csvrow[0] = datecam[0] + " %02d:%02d" % (m/60, m%60)
-            csvrow[1:LENDCROW+1] = [str(x) for x in trow]
+            csvrow[1:LENDCROW+1] = [str(x) if x!=None else None for x in trow]
             writer.writerow(csvrow)
     os.rename(fp, os.path.join(statspath, datecam_to_fn(datecam)))
     statdict[datecam][LOCK].release()
@@ -205,17 +208,30 @@ def minute_stats(timestamp, cameras):
     # write each changed stats table out to the filesystem
     # write the stats page html
     ts_tm = time.localtime(timestamp)
-    date = time.strftime("%Y-%m-%d", ts_tm)
+    today = time.strftime("%Y-%m-%d", ts_tm)
     minute = ts_tm.tm_hour*60 + ts_tm.tm_min
+    datepaths = get_daydirs()
     for cam in cameras:
-        datecam = (date, cam.shortname)
-        dcpath = os.path.join(incrootpath, date, cam.shortname)
-        # should just count jpegs, here, but this is lower impact
-        n = len(os.listdir(dcpath))
-        (lock, table) = lock_datecam(datecam)
-        table[minute][NUNPROC] = n
+        unproctoday = 0
+        unprocprevdays = 0
+        for dp in datepaths:
+            dcp = os.path.join(dp, cam.shortname)
+            if os.path.isdir(dcp):
+                # should just count jpegs, here, but this is lower impact
+                # 6 is allowance for standard dirs and files in old
+                # communityview
+                n = len(os.listdir(dcp) - 6)
+                n = 0 if n < 0 else n
+                (_, d) = os.path.split(dcp)
+                if d == today:
+                    unproctoday += n
+                else:
+                    unprocprevdays += n
+        (lock, table) = lock_datecam((today, cam.shortname))
+        table[minute][NUNPROC] = unproctoday
+        table[minute][NUNPROCPREV] = unprocprevdays
         lock.release()
-        
+    
     for k in statdict.keys():
         if isinstance(k, tuple):    # if k is a datecam, not a server date
             write_dctable(k)
