@@ -1,13 +1,10 @@
-# vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4 
-# vim syntax on
-# vim filetype indent plugin on
 
 from localsettings import incrootpath
 import threading
 import os.path
 import csv
 import datetime
-from communityview import dir2date, file2time, get_daydirs
+from communityview import dir2date, file2time, get_daydirs, get_images_in_dir
 import time
 import logging
 
@@ -217,12 +214,8 @@ def minute_stats(timestamp, cameras):
         for dp in datepaths:
             dcp = os.path.join(dp, cam.shortname)
             if os.path.isdir(dcp):
-                # should just count jpegs, here, but this is lower impact
-                # 6 is allowance for standard dirs and files in old
-                # communityview
-                n = len(os.listdir(dcp) - 6)
-                n = 0 if n < 0 else n
-                (_, d) = os.path.split(dcp)
+                n = len(get_images_in_dir(dcp))
+                (_, d) = os.path.split(dp)
                 if d == today:
                     unproctoday += n
                 else:

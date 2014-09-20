@@ -10,6 +10,8 @@ import os
 import datetime
 import time
 from testutils import filename_to_time, dirname_to_datetime
+import shutil
+import communityview    # see test020minute_stats() below
 
 class MockTime():
     """Monkey patch time.time() to return a timestamp set by set_time()."""
@@ -148,7 +150,33 @@ class TestStats(unittest.TestCase):
                 if newtable[row] != origtable[row]:
                     print "Row %d  new: %s" % (row, newtable[row])
                     print "Row %d orig: %s" % (row, origtable[row])
-                    assert False
+                    assert False, "Newly read in table does not match original"
+
+    def test020minute_stats(self):
+        """Test minute_stats() tally of unprocessed files."""
+        # because minute_stats() uses get_daydirs() util in communityview :-P
+        communityview.incrootpath = stats.incrootpath 
+        
+        shutil.rmtree(stats.incrootpath, False, None)
+        os.mkdir(stats.incrootpath)
+        datecamfiles = ((("2014-07-01", testsettings.cameras[0].shortname), 3),
+                        (("2014-06-30", testsettings.cameras[0].shortname), 4),
+                        (("2014-06-29", testsettings.cameras[0].shortname), 5))
+        for (datecam, nfiles) in datecamfiles:
+            dcpath = os.path.join(stats.incrootpath, datecam[0], datecam[1])
+            os.makedirs(dcpath)
+            for i in range(nfiles): # create nfiles files in the datecam dir
+                open(os.path.join(dcpath, "%05d.jpg" % i), 'a').close()
+        
+        test_min = 3
+        test_now = time.mktime(datetime.datetime(2014, 7, 1, 0, test_min, 0) \
+                               .timetuple())
+        stats.minute_stats(test_now, testsettings.cameras)
+        trow = stats.statdict[datecamfiles[0][0]][stats.TABLE][test_min]
+        assert trow[stats.NUNPROC] == 3 and trow[stats.NUNPROCPREV] == 9, \
+                "Wrong count of unprocessed files: today: %d, prev: %d. " \
+                "Should have been %d, %d." % \
+                (trow[stats.NUNPROC], trow[stats.NUNPROCPREV], 3, 9)
 
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testStats']
