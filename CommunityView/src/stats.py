@@ -40,9 +40,10 @@ statdict = {}
 dictlock = threading.RLock()
 
 # datecam and per-server tables statdict:
-# top level is list: [RLock, table]
+# top level is list: [RLock, table, changed]
 LOCK = 0
 TABLE = 1
+CHANGED = 2
 
 # datecam table column indicies
 NCREATE     = 0 # number of uploaded images that were created during this minute
@@ -89,19 +90,21 @@ def number(string):
     except ValueError:
         return float(string)
 
-def lock_datecam(datecam):
+def lock_datecam(datecam, changed=True):
     """Insure the stats table for the datecam is in memory, and return a tuple
     consisting of an acquired RLock for accessing the table (which must be
     released when the thread is done accessing/updating the table) and the
     table. If there is no existing table file, initialize all table values to
-    None."""
+    None.  It is assumed that the table is being retrieved in order to make
+    changes. If the changed flag is set (default) the table will be marked to be 
+    written to the filesystem at the next one-minute tick."""
     dictlock.acquire() 
     if datecam not in statdict:
         # begin with an empty table
         trow = [None] * LENDCROW
         table = [None] * MINPERDAY  # initialization optimization
         table = [list(trow) for _ in range(MINPERDAY)]
-        statdict[datecam] = [threading.RLock(), table]
+        statdict[datecam] = [threading.RLock(), table,  changed]
         
         fp = os.path.join(statspath, datecam_to_fn(datecam))
         if os.path.isfile(fp):
@@ -198,6 +201,7 @@ def write_dctable(datecam):
             csvrow[1:LENDCROW+1] = [str(x) if x!=None else None for x in trow]
             writer.writerow(csvrow)
     os.rename(fp, os.path.join(statspath, datecam_to_fn(datecam)))
+    statdict[datecam][CHANGED] = False
     statdict[datecam][LOCK].release()
     
 def minute_stats(timestamp, cameras):
@@ -227,7 +231,8 @@ def minute_stats(timestamp, cameras):
     
     for k in statdict.keys():
         if isinstance(k, tuple):    # if k is a datecam, not a server date
-            write_dctable(k)
+            if statdict[k][CHANGED]:
+                write_dctable(k)
             
     
 def stats_thread(cameras):
