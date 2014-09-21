@@ -62,19 +62,28 @@ class TestStats(unittest.TestCase):
         pass
 
     def call_proc_stats(self, datecam, fnprefix, nfiles, uplat, proclat):
-        """Call proc_stats() nfiles times with the given datecam and file name 
-        prefix (e.g., "12-01-00"), also passing it an appropriate mtime and 
-        manipulating the return value of time.time() to represent the specified
-        upload latency and processing latency in minutes.
-        Return the timestamp used as "now"."""
+        """Call proc_stats() nfiles times, each with a file pathname constructed
+        according to the datecam and file name prefix (e.g., "12-01-00"), and 
+        set to the appropriate mtime, while manipulating the return value of 
+        time.time() to represent the specified upload latency and processing 
+        latency in minutes.  Return the timestamp used as "now"."""
         date_dt = dirname_to_datetime(datecam[0])
         for i in range(nfiles):
             fn = fnprefix + "-%05d.jpg" % (i+1)
             mtime = time.mktime((date_dt + filename_to_time(fn)).timetuple()) \
                     + uplat * 60
             test_now = float(mtime + proclat * 60)
+            
+            # create target file
+            dp = os.path.join(stats.incrootpath, datecam[0], datecam[1])
+            if not os.path.isdir(dp):
+                os.makedirs(dp)
+            fp = os.path.join(dp, fn)
+            open(fp, 'a').close()
+            os.utime(fp, (mtime, mtime))
+            
             MockTime.set_time(test_now)
-            stats.proc_stats(datecam, fn, mtime)
+            stats.proc_stats(fp)
             MockTime.restore_time()
         return test_now
     

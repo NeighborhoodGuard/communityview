@@ -132,8 +132,14 @@ def lock_datecam(datecam, changed=True):
     dictlock.release()
     return (statdict[datecam][LOCK], statdict[datecam][TABLE])
 
-def proc_stats(datecam, filename, mtime):
-    """Called by image processing code to record image processing statistics."""
+def proc_stats(imagepath):
+    """Called by image processing code to record image processing statistics for
+    the given image file."""
+    (p, filename) = os.path.split(imagepath)
+    (p, cam) = os.path.split(p)
+    (_, date) = os.path.split(p)
+    datecam = (date, cam)
+    mtime = os.path.getmtime(imagepath)
 
     # the upload latency is recorded with respect to the time the image was
     # created, which is indicated by the image filename
