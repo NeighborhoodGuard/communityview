@@ -1,9 +1,31 @@
+################################################################################
+#
+# Copyright (C) 2012-2014 Neighborhood Guard, Inc.  All rights reserved.
+# Original author: Douglas Kerr
+# 
+# This file is part of CommunityView.
+# 
+# CommunityView is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# CommunityView is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+# 
+# You should have received a copy of the GNU Affero General Public License
+# along with CommunityView.  If not, see <http://www.gnu.org/licenses/>.
+#
+################################################################################
 
 from localsettings import incrootpath
 import threading
 import os.path
 import csv
 import datetime
+# utility functions in communityview that should be moved into a separate file
 from communityview import dir2date, file2time, get_daydirs, get_images_in_dir
 import time
 import logging
@@ -96,7 +118,7 @@ def lock_datecam(datecam, changed=True):
     released when the thread is done accessing/updating the table) and the
     table. If there is no existing table file, initialize all table values to
     None.  It is assumed that the table is being retrieved in order to make
-    changes. If the changed flag is set (default) the table will be marked to be 
+    changes. If the changed flag is set (default) the table will be marked to be
     written to the filesystem at the next one-minute tick."""
     dictlock.acquire() 
     if datecam not in statdict:
@@ -239,9 +261,11 @@ def minute_stats(timestamp, cameras):
         if isinstance(k, tuple):    # if k is a datecam, not a server date
             if statdict[k][CHANGED]:
                 write_dctable(k)
-            
+
+def restart_stats():
+    pass
     
-def stats_thread(cameras):
+def stats_loop(cameras):
     """Called by stats thread to run the per-minute stats processing.  Cameras
     is the list of camera objects."""
     while True:
