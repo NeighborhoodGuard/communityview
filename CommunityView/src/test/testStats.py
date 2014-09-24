@@ -20,8 +20,12 @@
 #
 ################################################################################
 import unittest
-import stats
 import testsettings
+import localsettings
+
+localsettings.root = testsettings.root
+
+import stats
 import os
 import datetime
 import time
@@ -65,9 +69,6 @@ class MockTime():
 class TestStats(unittest.TestCase):
 
     def setUp(self):
-        stats.incrootpath = testsettings.incrootpath
-        stats.lwebrootpath = testsettings.lwebrootpath
-        stats.statspath = os.path.join(stats.lwebrootpath, "stats")
         if not os.path.isdir(stats.statspath):
             os.makedirs(stats.statspath)
         for f in os.listdir(stats.statspath):
@@ -91,7 +92,7 @@ class TestStats(unittest.TestCase):
             test_now = float(mtime + proclat * 60)
             
             # create target file
-            dp = os.path.join(stats.incrootpath, datecam[0], datecam[1])
+            dp = os.path.join(stats.root, datecam[0], datecam[1])
             if not os.path.isdir(dp):
                 os.makedirs(dp)
             fp = os.path.join(dp, fn)
@@ -180,15 +181,16 @@ class TestStats(unittest.TestCase):
     def test020minute_stats(self):
         """Test minute_stats() tally of unprocessed files."""
         # because minute_stats() uses get_daydirs() util in communityview :-P
-        communityview.incrootpath = stats.incrootpath 
+        communityview.root = stats.root 
         
-        shutil.rmtree(stats.incrootpath, False, None)
-        os.mkdir(stats.incrootpath)
+        shutil.rmtree(stats.root, False, None)
+        os.mkdir(stats.root)
+        os.mkdir(stats.statspath)   # XXX hack while statspath under root
         datecamfiles = ((("2014-07-01", testsettings.cameras[0].shortname), 3),
                         (("2014-06-30", testsettings.cameras[0].shortname), 4),
                         (("2014-06-29", testsettings.cameras[0].shortname), 5))
         for (datecam, nfiles) in datecamfiles:
-            dcpath = os.path.join(stats.incrootpath, datecam[0], datecam[1])
+            dcpath = os.path.join(stats.root, datecam[0], datecam[1])
             os.makedirs(dcpath)
             for i in range(nfiles): # create nfiles files in the datecam dir
                 open(os.path.join(dcpath, "%05d.jpg" % i), 'a').close()

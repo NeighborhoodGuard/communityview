@@ -1,7 +1,7 @@
 ################################################################################
 #
 # Copyright (C) 2012-2014 Neighborhood Guard, Inc.  All rights reserved.
-# Original author: Jesper Jercenoks
+# Original author: Jesper Jurcenoks
 # 
 # This file is part of CommunityView.
 # 
@@ -41,7 +41,7 @@ import threading
 import time
 import logging.handlers
 import stats
-
+from utils import dir2date, file2time, get_images_in_dir, get_daydirs
 from localsettings import * #@UnusedWildImport (Camera)
 
     
@@ -510,6 +510,7 @@ def process_sequence(indir, sequences, cam, sequence_index):
         make_image_html(indir, sequences, sequence_index, image_index)
 
     return
+<<<<<<< HEAD
 
 
 def dir2date(indir):
@@ -698,19 +699,6 @@ def deltree(deldir):
     rmdir(deldir)
     return
 
-
-def get_daydirs():        
-    daydirlist = os.listdir(root)
-
-    daydirs=[]
-    for direc in daydirlist:
-        (year, unused_month, unused_day) = dir2date(direc)
-        dirpath = os.path.join(root, direc)
-        if os.path.isdir(dirpath) and year != None:
-            daydirs.append(dirpath)
-    daydirs = sorted(daydirs)
-
-    return daydirs
 
 def purge_images(daydirs):
     logging.info("Starting purge_images()")

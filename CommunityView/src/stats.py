@@ -20,15 +20,16 @@
 #
 ################################################################################
 
-from localsettings import incrootpath
+from localsettings import incrootpath # and lwebrootpath when there is one
 import threading
 import os.path
 import csv
 import datetime
-# utility functions in communityview that should be moved into a separate file
-from communityview import dir2date, file2time, get_daydirs, get_images_in_dir
+from utils import dir2date, file2time, get_daydirs, get_images_in_dir, \
+                    set_thread_prefix
 import time
 import logging
+import platform
 
 
 # general exception for stats problems
@@ -228,6 +229,8 @@ def write_dctable(datecam):
             csvrow[0] = datecam[0] + " %02d:%02d" % (m/60, m%60)
             csvrow[1:LENDCROW+1] = [str(x) if x!=None else None for x in trow]
             writer.writerow(csvrow)
+    if platform.system == "Windows":    # :-P no atomic move & replace
+        os.remove(os.path.join(statspath, datecam_to_fn(datecam)))
     os.rename(fp, os.path.join(statspath, datecam_to_fn(datecam)))
     statdict[datecam][CHANGED] = False
     statdict[datecam][LOCK].release()
@@ -263,14 +266,25 @@ def minute_stats(timestamp, cameras):
                 write_dctable(k)
 
 def restart_stats():
+    if not os.path.isdir(statspath):
+        os.mkdir(statspath)
     pass
     
+# Flag to stop the stats loop for test purposes.
+# Only for manipulation by testing code; always set to False in this file
+#
+terminate_stats_loop = False 
+    
 def stats_loop(cameras):
-    """Called by stats thread to run the per-minute stats processing.  Cameras
+    """Called by stats thread to run the per-minute stats processing.  cameras
     is the list of camera objects."""
+    set_thread_prefix(threading.current_thread(), "Stats")
+    logging.info("Starting stats_loop()")
     while True:
         ts = time.time()
         time.sleep(60 - ts%60)
         minute_stats(time.time(), cameras)
+        if terminate_stats_loop:
+            return
 
     
