@@ -41,7 +41,7 @@ class StatsError(Exception):
 #   per camera: YYYY-DD-MM_camerashortname.csv
 #   per server: YYYY-DD-MM.csv
 #
-# All files are in lwebrootpath/stats.  Saved for same number of days as images.
+# All files are in lwebrootpath/perf.  Saved for same number of days as images.
 # In-memory values are stored in a dictionary of datecam-minute lists for the
 # per-camera values and date-minute lists for the server data.
 # Key is filename minus extension, value points to list of 1440 (one per second)
@@ -51,7 +51,7 @@ class StatsError(Exception):
 # XXX hack for initial implementation on old CommunityView
 lwebrootpath = root
 
-statspath = os.path.join(lwebrootpath, "stats")
+statspath = os.path.join(lwebrootpath, "perf")
 
 # the key for the dictionary are either datecams (for the per-day, per-camera
 # data, or the string date (YYYY-MM-DD) for the per-day server data.
@@ -152,6 +152,7 @@ def lock_datecam(datecam, changed=True):
                 raise StatsError("%s: wrong number of data rows: %d" \
                                  % (fp, rindex))
     statdict[datecam][LOCK].acquire()
+    statdict[datecam][CHANGED] = changed
     dictlock.release()
     return (statdict[datecam][LOCK], statdict[datecam][TABLE])
 
@@ -171,10 +172,11 @@ def proc_stats(imagepath):
     fndt = datetime.datetime(yr, mo, day, hr, minute, sec)
     createminute = hr*60 + minute
     uplatdelta = datetime.datetime.fromtimestamp(mtime) - fndt
-    if uplatdelta.days < 0 or uplatdelta.seconds < 0:
-        raise StatsError("upload latency is negative: %s %s" % \
-                         (datecam, filename))
     uplat = uplatdelta.days*24*60 + float(uplatdelta.seconds)/60
+    if uplat < 0:
+        logging.warn("upload latency is negative: %s %s: %d minutes" % \
+                         (datecam, filename, uplat))
+        uplat = 0
         
     (lock, table) = lock_datecam(datecam)        
     row = table[createminute]
@@ -229,9 +231,11 @@ def write_dctable(datecam):
             csvrow[0] = datecam[0] + " %02d:%02d" % (m/60, m%60)
             csvrow[1:LENDCROW+1] = [str(x) if x!=None else None for x in trow]
             writer.writerow(csvrow)
-    if platform.system == "Windows":    # :-P no atomic move & replace
-        os.remove(os.path.join(statspath, datecam_to_fn(datecam)))
-    os.rename(fp, os.path.join(statspath, datecam_to_fn(datecam)))
+    dcfilepath = os.path.join(statspath, datecam_to_fn(datecam))
+    if platform.system() == "Windows":    # :-P no atomic move & replace
+        if os.path.isfile(dcfilepath):
+            os.remove(dcfilepath)
+    os.rename(fp, dcfilepath)
     statdict[datecam][CHANGED] = False
     statdict[datecam][LOCK].release()
     
