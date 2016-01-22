@@ -156,6 +156,15 @@ def lock_datecam(datecam, changed=True):
     dictlock.release()
     return (statdict[datecam][LOCK], statdict[datecam][TABLE])
 
+def zeroback(table, rowindex, colindex):
+    """Starting with row rowindex-1 and working backward, replace all None
+    values in the specified column of the table with integer zero until a
+    non-None value is encountered."""
+    rowindex -= 1
+    while rowindex >= 0 and table[rowindex][colindex] is None:
+        table[rowindex][colindex] = 0
+        rowindex -= 1
+
 def proc_stats(imagepath):
     """Called by image processing code to record image processing statistics for
     the given image file."""
@@ -182,9 +191,11 @@ def proc_stats(imagepath):
     row = table[createminute]
     if row[NCREATE] is None:
         row[NCREATE] = 0
+    if row[AVGUPLAT] is None:
         row[AVGUPLAT] = 0.0
     row[AVGUPLAT] = (row[AVGUPLAT] * row[NCREATE] + uplat) / (row[NCREATE] + 1)
     row[NCREATE] += 1
+    zeroback(table, createminute, NCREATE)
     lock.release()
     
     # the processing latency is recorded with respect the time the image was
@@ -200,10 +211,12 @@ def proc_stats(imagepath):
     row = table[uploadminute]
     if row[NUPLOAD] is None:
         row[NUPLOAD] = 0
+    if row[AVGPROCLAT] is None:
         row[AVGPROCLAT] = 0.0
     row[AVGPROCLAT] = (row[AVGPROCLAT] * row[NUPLOAD] + proclat) \
                         / (row[NUPLOAD] + 1)
     row[NUPLOAD] += 1
+    zeroback(table, uploadminute, NUPLOAD)
     lock.release()
     
     # the record the number of images processed this minute
@@ -215,6 +228,7 @@ def proc_stats(imagepath):
     if table[nowminute][NPROC] is None:
         table[nowminute][NPROC] = 0
     table[nowminute][NPROC] += 1
+    zeroback(table, nowminute, NPROC)
     lock.release()
 
 def write_dctable(datecam):
