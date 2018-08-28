@@ -32,7 +32,7 @@
 version="1.0.0"
 
 . ./utils.sh
-. ./confui.sh
+#. ./confui.sh
 
 confile=cvserver.conf
 
@@ -105,6 +105,32 @@ mk_dir() {
     fi
 }
 
+# Edit the site config file specified in the first argument:
+# insert a <Directory> block into the config file for /var/www
+# that will allow .htaccess files to be added to the website tree
+# and permit the use of basic authentication for part or all
+# of the site
+# XXX needs a unit test
+#
+editsiteconf() {
+    local block=""
+
+    block="$block"'\t<Directory /var/www/>'
+    block="$block"'\n\t  Options Indexes FollowSymLinks'
+    block="$block"'\n\t  AllowOverride All'
+    block="$block"'\n\t  Require all granted'
+    block="$block"'\n\t</Directory>'
+
+    if grep -E '[[:space:]]*<Directory +/var/www/>' $1 > /dev/null
+    then
+    local ar
+    ar='/[:space:]*<Directory +\/var\/www\/>/,/[:space:]*<\/Directory>/'
+        sed -i -r "${ar}c\\$block" "$1"
+    else
+        sed -i -r "/[:space:]*<\/VirtualHost>/i\\\n$block\n" "$1"
+    fi
+}
+
 # take the config information and build the server
 #
 configure() {
@@ -129,12 +155,6 @@ configure() {
     systemctl disable communityview || true
     tgt=$systemd_dir/communityview.service
     rm -f "$tgt"
-
-    
-    task="installing and configuing Apache Web server"
-    echo "***** $task" | tee /dev/tty
-    install apache2
-    local up_user=`get_config $confile up_user`
 
     # configure for upload FTP.  It seems that the only simple way to
     # deny login to the upload user but allow the upload user to connect
@@ -161,6 +181,7 @@ configure() {
     # create the local FTP user account for the upload machine
     # and give it access to the incoming images dir
     #
+    local up_user=`get_config $confile up_user`
     if id -u $up_user > /dev/null 2>&1
     then
         deluser --quiet $up_user 
@@ -183,6 +204,30 @@ configure() {
     # set proftpd up to be run on boot and restart it with the new config
     update-rc.d proftpd defaults
     service proftpd restart
+
+    task="installing and configuing Apache Web server"
+    echo "***** $task" | tee /dev/tty
+    install apache2
+
+    # edit the default site conf file to allow for htaccess files
+    editsiteconf /etc/apache2/sites-available/000-default.conf
+
+    # Create and htaccess file for the whole site.
+    # Note that this file needs to be moved to .htaccess in order
+    # to activate basic authentication
+    local sitedir=/var/www/html
+    cat << EOF > $sitedir/htaccess
+AuthType Basic
+AuthName \"Authorized Users Only\"
+AuthUserFile /var/www/html/.htpasswd
+Require valid-user
+EOF
+    chown $up_user:$up_user $sitedir/htaccess
+
+    # touch the .htpasswd file for the site so that the user doesn't
+    # have to create it (so naive users don't get used to htpasswd -c)
+    touch $sitedir/.htpasswd
+    chown $up_user:$up_user $sitedir/.htpasswd
 
     task="installing python and its imaging library"
     echo "***** $task" | tee /dev/tty
