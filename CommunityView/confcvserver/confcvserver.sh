@@ -187,7 +187,7 @@ configure() {
     local sitedir=/var/www/html
     cat << EOF > $sitedir/htaccess
 AuthType Basic
-AuthName \"Authorized Users Only\"
+AuthName "Authorized Users Only"
 AuthUserFile /var/www/html/.htpasswd
 Require valid-user
 EOF
