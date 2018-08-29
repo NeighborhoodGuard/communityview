@@ -156,30 +156,15 @@ configure() {
     tgt=$systemd_dir/communityview.service
     rm -f "$tgt"
 
-    # configure for upload FTP.  It seems that the only simple way to
+    task="creating the upload user account"
+    echo "***** $task" | tee /dev/tty
+
+    # if the upload user account exits, delete it, then create the user.
+    # It seems that the only simple way to
     # deny login to the upload user but allow the upload user to connect
     # via FTP is to put the no-login-shell into /etc/shells then set
     # the upload user's shell to it.  If it's not in /etc/shells,
     # proftpd won't allow the user to connect via FTP
-    #
-    task="installing proftpd and configuring FTP access"
-    echo "***** $task" | tee /dev/tty
-
-    # install debconf-utils so we can pre-configure proftpd not to ask the user
-    # whether it should be run under inetd or standalone
-    install debconf-utils  # info output to log
-    echo "proftpd-basic shared/proftpd/inetd_or_standalone select standalone" \
-        | debconf-set-selections   # info output to log
-
-    install proftpd
-        
-    if ! grep "^$nologinshell\$" /etc/shells > /dev/null
-    then
-        echo $nologinshell >> /etc/shells
-    fi
-
-    # create the local FTP user account for the upload machine
-    # and give it access to the incoming images dir
     #
     local up_user=`get_config $confile up_user`
     if id -u $up_user > /dev/null 2>&1
@@ -187,23 +172,7 @@ configure() {
         deluser --quiet $up_user 
     fi
     useradd -d $inc_dir -U -s $nologinshell $up_user
-    chown -R $up_user:$up_user $inc_dir    
-    chmod 775 $inc_dir
     echo "$up_user:`get_config $confile up_pass`" | chpasswd
-    
-    # limit FTP users to their login directory and below 
-    local cf=/etc/proftpd/proftpd.conf
-    if ! grep -E '^DefaultRoot\s+~' "$cf" > /dev/null
-    then
-        echo \
-           "# The configuration below was added by the confcvserver script" \
-            >> $cf
-        echo 'DefaultRoot ~' >> $cf
-    fi
-    
-    # set proftpd up to be run on boot and restart it with the new config
-    update-rc.d proftpd defaults
-    service proftpd restart
 
     task="installing and configuing Apache Web server"
     echo "***** $task" | tee /dev/tty
@@ -228,6 +197,42 @@ EOF
     # have to create it (so naive users don't get used to htpasswd -c)
     touch $sitedir/.htpasswd
     chown $up_user:$up_user $sitedir/.htpasswd
+
+    # configure for FTP upload 
+    #
+    task="installing proftpd and configuring FTP access"
+    echo "***** $task" | tee /dev/tty
+
+    # install debconf-utils so we can pre-configure proftpd not to ask the user
+    # whether it should be run under inetd or standalone
+    install debconf-utils  # info output to log
+    echo "proftpd-basic shared/proftpd/inetd_or_standalone select standalone" \
+        | debconf-set-selections   # info output to log
+
+    install proftpd
+        
+    if ! grep "^$nologinshell\$" /etc/shells > /dev/null
+    then
+        echo $nologinshell >> /etc/shells
+    fi
+
+    # give the FTP user access to the incoming directory
+    chown -R $up_user:$up_user $inc_dir    
+    chmod 775 $inc_dir
+    
+    # limit FTP users to their login directory and below 
+    local cf=/etc/proftpd/proftpd.conf
+    if ! grep -E '^DefaultRoot\s+~' "$cf" > /dev/null
+    then
+        echo \
+           "# The configuration below was added by the confcvserver script" \
+            >> $cf
+        echo 'DefaultRoot ~' >> $cf
+    fi
+    
+    # set proftpd up to be run on boot and restart it with the new config
+    update-rc.d proftpd defaults
+    service proftpd restart
 
     task="installing python and its imaging library"
     echo "***** $task" | tee /dev/tty
