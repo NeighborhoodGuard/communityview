@@ -1,5 +1,4 @@
 #!/bin/sh
-
 ################################################################################
 #
 # Copyright (C) 2018 Neighborhood Guard, Inc.  All rights reserved.
@@ -105,12 +104,11 @@ mk_dir() {
     fi
 }
 
-# Edit the site config file specified in the first argument:
+# Edit the Apache site config file specified in the first argument:
 # insert a <Directory> block into the config file for /var/www
 # that will allow .htaccess files to be added to the website tree
 # and permit the use of basic authentication for part or all
 # of the site
-# XXX needs a unit test
 #
 editsiteconf() {
     local block=""
@@ -124,10 +122,51 @@ editsiteconf() {
     if grep -E '[[:space:]]*<Directory +/var/www/>' $1 > /dev/null
     then
     local ar
-    ar='/[:space:]*<Directory +\/var\/www\/>/,/[:space:]*<\/Directory>/'
+    ar='/[[:space:]]*<Directory +\/var\/www\/>/,/[:space:]*<\/Directory>/'
         sed -i -r "${ar}c\\$block" "$1"
     else
-        sed -i -r "/[:space:]*<\/VirtualHost>/i\\\n$block\n" "$1"
+        sed -i -r "/[[:space:]]*<\/VirtualHost>/i\\\n$block\n" "$1"
+    fi
+}
+
+# Edit the type of config file that uses no punctuation to separate
+# the name from the value, but only spaces.  E.g., has lines of the form
+#    name value
+# rather than
+#    name = value
+# or
+#    name: value
+# value may contain spaces and is not followed by a comment.
+# If the name is not found in the file, append the name-value pair
+# to the end of the config file
+#
+# usage: editnpconf filename name value
+#
+# XXX needs a unit test
+#
+editnpconf() {
+    local cf="$1"
+    local nm=$2
+    local val="$3"
+    if [ $# -ne 3 ]
+    then
+        echo "usage: editnpconf filename name value"
+        return 1
+    fi
+    if [ ! -e "$cf" ]
+    then
+        echo "editnpconf: can't find config file: $cf"
+        return 1
+    fi
+
+    # If the name is found, replace the value while preserving indentation
+    # and spacing.  
+    # Otherwise, append the name-value pair to the end of the file
+    if grep -E "^[[:space:]]*$nm[[:space:]]+" "$cf" > /dev/null
+    then
+        sed -i -r "/^([[:space:]]*)$nm([[:space:]]+).+$/s//\1$nm\2$val/" "$cf"
+    else
+        echo "$nm" "$val" >> "$cf"
     fi
 }
 
@@ -160,11 +199,6 @@ configure() {
     echo "***** $task" | tee /dev/tty
 
     # if the upload user account exits, delete it, then create the user.
-    # It seems that the only simple way to
-    # deny login to the upload user but allow the upload user to connect
-    # via FTP is to put the no-login-shell into /etc/shells then set
-    # the upload user's shell to it.  If it's not in /etc/shells,
-    # proftpd won't allow the user to connect via FTP
     #
     local up_user=`get_config $confile up_user`
     if id -u $up_user > /dev/null 2>&1
@@ -211,24 +245,22 @@ EOF
 
     install proftpd
         
-    if ! grep "^$nologinshell\$" /etc/shells > /dev/null
-    then
-        echo $nologinshell >> /etc/shells
-    fi
-
     # give the FTP user access to the incoming directory
     chown -R $up_user:$up_user $inc_dir    
     chmod 775 $inc_dir
     
-    # limit FTP users to their login directory and below 
+    # configure proftpd by editing its conf file
+    #
     local cf=/etc/proftpd/proftpd.conf
-    if ! grep -E '^DefaultRoot\s+~' "$cf" > /dev/null
-    then
-        echo \
-           "# The configuration below was added by the confcvserver script" \
-            >> $cf
-        echo 'DefaultRoot ~' >> $cf
-    fi
+    # limit FTP users to their login directory and below 
+    editnpconf $cf DefaultRoot '~'
+    # all the upload user account to be used for FTP without a login shell
+    editnpconf $cf RequireValidShell off
+    # set the passive port range; must agree w/ firewall rules for this server
+    editnpconf $cf PassivePorts "60000 60999"
+    # if we're running in an AWS EC2 instance, get the public IP address
+    # so proftpd can tell the client how to do passive mode
+    ### TBS ###
     
     # set proftpd up to be run on boot and restart it with the new config
     update-rc.d proftpd defaults
