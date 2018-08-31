@@ -173,12 +173,19 @@ editnpconf() {
 # take the config information and build the server
 #
 configure() {
-    local cfg=$conf_file
-    
     # Set up to catch unexpected errors and notify user
     #
     trap errorexit EXIT
     set -e
+
+    # make sure we have a conf file
+    task="checking the configuration file"
+    echo "***** $task"
+    if [ ! -r "$confile" ]
+    then
+        echo "Cannot open configuration file: $confile"
+        return 1
+    fi
 
     task="updating the available system software listing"
     echo "***** $task" | tee /dev/tty
