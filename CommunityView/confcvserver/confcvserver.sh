@@ -260,7 +260,11 @@ EOF
     editnpconf $cf PassivePorts "60000 60999"
     # if we're running in an AWS EC2 instance, get the public IP address
     # so proftpd can tell the client how to do passive mode
-    ### TBS ###
+    if [ -e /sys/hypervisor/uuid ] && grep -q '^ec2' /sys/hypervisor/uuid
+    then
+        editnpconf $cf MasqueradeAddress \
+            `curl http://169.254.169.254/latest/meta-data/public-ipv4`
+    fi
     
     # set proftpd up to be run on boot and restart it with the new config
     update-rc.d proftpd defaults
