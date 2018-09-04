@@ -187,6 +187,14 @@ configure() {
         return 1
     fi
 
+    task="setting the time zone"
+    local tz=`get_config $confile timezone`
+    if [ -n "$tz" ]
+    then
+        echo "***** $task" | tee /dev/tty
+        timedatectl set-timezone $tz
+    fi
+
     task="updating the available system software listing"
     echo "***** $task" | tee /dev/tty
     # update and upgrade the system
