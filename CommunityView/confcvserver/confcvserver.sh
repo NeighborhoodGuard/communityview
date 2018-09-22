@@ -35,6 +35,9 @@ version="1.0.0"
 
 confile=cvserver.conf
 
+# the upload user's home directory
+up_user_home=/var/www
+
 # The incoming directory that the cameras or upload machine will be
 # uploading to.  Currently, this is the same as the top directory
 # for the Web server.  One day, CommunityView will be changed so that
@@ -213,15 +216,18 @@ configure() {
     task="creating the upload user account"
     echo "***** $task" | tee /dev/tty
 
-    # if the upload user account exits, delete it, then create the user.
+    # if the upload user account exists, for safety's sake don't delete it,
+    # just make sure the home directory and password are correct
     #
     local up_user=`get_config $confile up_user`
-    if id -u $up_user > /dev/null 2>&1
+    if id $up_user > /dev/null 2>&1
     then
-        deluser --quiet $up_user 
+        moduser -d $up_user_home $up_user
+    else
+        useradd -U -d $up_user_home $up_user
     fi
-    useradd -d $inc_dir -U -s $nologinshell $up_user
     echo "$up_user:`get_config $confile up_pass`" | chpasswd
+    chown $up_user:$up_user $up_user_home
 
     task="installing and configuing Apache Web server"
     echo "***** $task" | tee /dev/tty
@@ -275,12 +281,19 @@ EOF
     editnpconf $cf PassivePorts "60000 60999"
     # if we're running in an AWS EC2 instance, get the public IP address
     # so proftpd can tell the client how to do passive mode
-    if [ -e /sys/hypervisor/uuid ] && grep -q '^ec2' /sys/hypervisor/uuid
+    local pubip=`curl -s -m 4 \
+        http://169.254.169.254/latest/meta-data/public-ipv4`
+    local curlstat=$?
+    if [ $curlstat -eq 6 ]  # host not found so we're not on AWS
     then
-        editnpconf $cf MasqueradeAddress \
-            `curl http://169.254.169.254/latest/meta-data/public-ipv4`
+        true
+    elif [ $curlstat -eq 0 ]  # sucess, we're on AWS; add the Masquerade line
+        editnpconf $cf MasqueradeAddress "$pubip"
+    else
+        echo "curl returns exit code of $curlstat. Unknown error."
+        false   # trigger an error abort
     fi
-    
+
     # set proftpd up to be run on boot and restart it with the new config
     update-rc.d proftpd defaults
     service proftpd restart
