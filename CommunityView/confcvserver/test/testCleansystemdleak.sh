@@ -23,7 +23,7 @@
 
 UNIT_TEST_IN_PROGRESS=1
 
-. ../fixsystemdleak.sh
+. ../cleansystemdleak.sh
 
 # set up the test directories
 sessiondir=tmp_sessd
@@ -70,7 +70,7 @@ setUp() {
     done
 }
 
-test_fixsystemdleak() {
+test_cleansystemdleak() {
     # run the cleanup
     cleanup
 
