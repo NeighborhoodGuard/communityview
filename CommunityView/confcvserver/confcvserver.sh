@@ -293,10 +293,16 @@ EOF
         echo "curl returns exit code of $curlstat. Unknown error."
         false   # trigger an error abort
     fi
+    # turn off the log files so the root fs will not fill up
+    editnpconf $cf SystemLog none
+    editnpconf $cf TransferLog none
+    editnpconf $cf WtmpLog off
 
-    # set proftpd up to be run on boot and restart it with the new config
+    # set proftpd up to be run on boot and restart it with the new config,
+    # then remove any log files that we've disabled
     update-rc.d proftpd defaults
     service proftpd restart
+    rm -f /var/log/proftpd/proftpd.log* /var/log/proftpd/xferlog*
 
     task="installing python and its imaging library"
     echo "***** $task" | tee /dev/tty
