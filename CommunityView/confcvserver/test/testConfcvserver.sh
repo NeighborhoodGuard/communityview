@@ -81,7 +81,99 @@ test_editnpconf_name_value_editing() {
     else
         rm $tef $tcf $tof
     fi
+}
 
+#
+# Test the editcrontab function for proper operation
+#
+
+_saved_crontab=''
+_no_crontab=''
+
+_save_crontab() {
+    _saved_crontab=`crontab -l 2> /dev/null`
+    _no_crontab=$?
+}
+
+_restore_crontab() {
+    if [ "$_no_crontab" -ne 0 ]
+    then
+        crontab -r 2> /dev/null
+    else
+        echo "$_saved_crontab" | crontab -
+    fi
+}
+
+_tef=unit_test_expected_crontab_file
+_taf=unit_test_actual_crontab_file
+
+# simple test crontab file
+_ct=''
+_ct="${_ct}# this is a unit-test comment\n"
+_ct="${_ct}* 1,2,3 * * * this is a unit-test command"
+
+test_editcrontab_no_crontab() {
+    rm -f $_tef $_taf
+    _save_crontab
+    /bin/echo -e "$_ct" > $_tef
+
+    crontab -r 2> /dev/null
+    editcrontab "nothing to delete" "$_ct"
+
+    crontab -l > $_taf
+    diff $_tef $_taf
+    assertTrue "Resulting crontab differes from expected" "test $? -eq 0"
+    _restore_crontab
+}
+
+test_editcrontab_unrelated_crontab() {
+    rm -f $_tef $_taf
+    _save_crontab
+    /bin/echo -e "$_ct" > $_tef
+
+    crontab -r 2> /dev/null
+    /bin/echo -e "$_ct" | crontab -
+    local entry="5,10,15 1,2,3 * * * /bin/specialcommand"
+    /bin/echo -e "$_ct" > $_tef
+    echo "$entry" >> $_tef
+
+    editcrontab "specialcommand" "$entry"
+
+    crontab -l > $_taf
+    diff $_tef $_taf
+    assertTrue "Resulting crontab differes from expected" "test $? -eq 0"
+    _restore_crontab
+}
+
+test_editcrontab_related_crontab() {
+    rm -f $_tef $_taf
+    _save_crontab
+    /bin/echo -e "$_ct" > $_tef
+
+    crontab -r 2> /dev/null
+    local oldentry="5,10,15 1,2,3 * * * /bin/specialcommand"
+    local newentry="* 4,5,6 * * * /bin/specialcommand arg1"
+    /bin/echo -e "$_ct\n$oldentry" | crontab -
+    /bin/echo -e "$_ct" > $_tef
+    echo "$newentry" >> $_tef
+
+    editcrontab "specialcommand" "$newentry"
+
+    crontab -l > $_taf
+    diff $_tef $_taf
+    assertTrue "Resulting crontab differes from expected" "test $? -eq 0"
+    _restore_crontab
+}
+
+test_editcrontab_bad_args() {
+    _save_crontab
+    assertFalse "editcrontab didn't fail on empty 2nd arg" \
+        "editcrontab foobar ''"
+    assertFalse "editcrontab didn't fail on empty 1st arg" \
+        "editcrontab '' foobar"
+    assertFalse "editcrontab didn't fail on empty args" \
+        "editcrontab"
+    _restore_crontab
 }
 
 . `which shunit2`

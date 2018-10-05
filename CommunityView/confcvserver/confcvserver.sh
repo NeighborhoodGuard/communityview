@@ -145,8 +145,6 @@ editsiteconf() {
 #
 # usage: editnpconf filename name value
 #
-# XXX needs a unit test
-#
 editnpconf() {
     local cf="$1"
     local nm=$2
@@ -171,6 +169,26 @@ editnpconf() {
     else
         echo "$nm" "$val" >> "$cf"
     fi
+}
+
+# Edit this user's crontab.
+# Delete any lines in the crontab that match the grep RE in the first
+# argument, and add the line(s) given in the second arguent.
+# A newline will be appended to the second argument
+# 
+editcrontab() {
+    if [ -z "$1" -o -z "$2" ]
+    then
+        echo "editcrontab must have exactly two non-empty arguments"
+        return 1
+    fi
+
+    tab=`crontab -l 2> /dev/null | grep -v "$1"`
+    if [ -n "$tab" ]
+    then
+        tab="$tab\n"
+    fi
+    echo "$tab$2" | crontab -
 }
 
 # take the config information and build the server
@@ -288,6 +306,7 @@ EOF
     then
         true
     elif [ $curlstat -eq 0 ]  # sucess, we're on AWS; add the Masquerade line
+    then
         editnpconf $cf MasqueradeAddress "$pubip"
     else
         echo "curl returns exit code of $curlstat. Unknown error."
