@@ -183,7 +183,8 @@ editcrontab() {
         return 1
     fi
 
-    tab=`crontab -l 2> /dev/null | grep -v "$1"`
+    # the cat at the end of the pipeline below masks the grep error status
+    tab=`crontab -l 2> /dev/null | grep -v "$1" | cat`
     if [ -n "$tab" ]
     then
         tab="$tab\n"
@@ -240,12 +241,11 @@ configure() {
     local up_user=`get_config $confile up_user`
     if id $up_user > /dev/null 2>&1
     then
-        moduser -d $up_user_home $up_user
+        usermod -d $up_user_home $up_user
     else
         useradd -U -d $up_user_home $up_user
     fi
     echo "$up_user:`get_config $confile up_pass`" | chpasswd
-    chown $up_user:$up_user $up_user_home
 
     task="installing and configuing Apache Web server"
     echo "***** $task" | tee /dev/tty
@@ -254,7 +254,10 @@ configure() {
     # edit the default site conf file to allow for htaccess files
     editsiteconf /etc/apache2/sites-available/000-default.conf
 
-    # Create and htaccess file for the whole site.
+    # now that the upload user's home exists, set its ownership
+    chown $up_user:$up_user $up_user_home
+
+    # Create an htaccess file for the whole site.
     # Note that this file needs to be moved to .htaccess in order
     # to activate basic authentication
     local sitedir=/var/www/html
@@ -299,19 +302,13 @@ EOF
     editnpconf $cf PassivePorts "60000 60999"
     # if we're running in an AWS EC2 instance, get the public IP address
     # so proftpd can tell the client how to do passive mode
-    local pubip=`curl -s -m 4 \
+    local pubip
+    if pubip=`curl -s -m 4 \
         http://169.254.169.254/latest/meta-data/public-ipv4`
-    local curlstat=$?
-    if [ $curlstat -eq 6 ]  # host not found so we're not on AWS
-    then
-        true
-    elif [ $curlstat -eq 0 ]  # sucess, we're on AWS; add the Masquerade line
-    then
+    then    # sucess, we're on AWS; add the Masquerade line
         editnpconf $cf MasqueradeAddress "$pubip"
-    else
-        echo "curl returns exit code of $curlstat. Unknown error."
-        false   # trigger an error abort
     fi
+        
     # turn off the log files so the root fs will not fill up
     editnpconf $cf SystemLog none
     editnpconf $cf TransferLog none
@@ -322,13 +319,6 @@ EOF
     update-rc.d proftpd defaults
     service proftpd restart
     rm -f /var/log/proftpd/proftpd.log* /var/log/proftpd/xferlog*
-
-    task="installing cleaner for systemd filesystem leak"
-    echo "***** $task" | tee /dev/tty
-    local name=cleansystemdleak
-    cp $name.sh $code_dir/$name
-    chmod 755 $code_dir/$name
-    editcrontab $name "7 8,14,20 * * * $code_dir/$name"
 
     task="installing python and its imaging library"
     echo "***** $task" | tee /dev/tty
@@ -388,6 +378,13 @@ EOF
     chown root:root $tgt
     systemctl enable communityview
     systemctl start communityview
+
+    task="installing cleaner for systemd filesystem leak"
+    echo "***** $task" | tee /dev/tty
+    local name=cleansystemdleak
+    cp $name.sh $code_dir/$name
+    chmod 755 $code_dir/$name
+    editcrontab $name "7 8,14,20 * * * $code_dir/$name"
 
     # Turn off error trap
     set +e
