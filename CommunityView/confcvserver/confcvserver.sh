@@ -323,6 +323,13 @@ EOF
     service proftpd restart
     rm -f /var/log/proftpd/proftpd.log* /var/log/proftpd/xferlog*
 
+    task="installing cleaner for systemd filesystem leak"
+    echo "***** $task" | tee /dev/tty
+    local name=cleansystemdleak
+    cp $name.sh $code_dir/$name
+    chmod 755 $code_dir/$name
+    editcrontab $name "7 8,14,20 * * * $code_dir/$name"
+
     task="installing python and its imaging library"
     echo "***** $task" | tee /dev/tty
     install "python python-imaging"
