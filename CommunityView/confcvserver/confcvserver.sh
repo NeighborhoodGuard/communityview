@@ -386,6 +386,12 @@ EOF
     chmod 755 $code_dir/$name
     editcrontab $name "7 8,14,20 * * * $code_dir/$name"
 
+    # accounts-daemon seems to have a bug wherein it frequently goes crazy
+    # and sucks up all the CPU
+    task="permanently disabling accounts-daemon"
+    echo "***** $task" | tee /dev/tty
+    systemctl --now mask accounts-daemon
+
     # Turn off error trap
     set +e
     trap - EXIT
