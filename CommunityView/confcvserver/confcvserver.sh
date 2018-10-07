@@ -44,6 +44,9 @@ up_user_home=/var/www
 # this is not the case.
 inc_dir=/var/www/html
 
+# the document root for the website
+site_dir=/var/www/html
+
 code_dir=/opt/communityview
 config_dir=/etc/opt/communityview # XXX future use
 var_dir=/var/opt/communityview
@@ -247,32 +250,59 @@ configure() {
     fi
     echo "$up_user:`get_config $confile up_pass`" | chpasswd
 
-    task="installing and configuing Apache Web server"
+    task="installing and configuring Apache Web server"
     echo "***** $task" | tee /dev/tty
     install apache2
 
     # edit the default site conf file to allow for htaccess files
     editsiteconf /etc/apache2/sites-available/000-default.conf
 
-    # now that the upload user's home exists, set its ownership
+    # give the upload user access to its home directory
     chown $up_user:$up_user $up_user_home
+    chmod 755 $up_user_home
 
-    # Create an htaccess file for the whole site.
-    # Note that this file needs to be moved to .htaccess in order
-    # to activate basic authentication
-    local sitedir=/var/www/html
-    cat << EOF > $sitedir/htaccess
-AuthType Basic
-AuthName "Authorized Users Only"
-AuthUserFile /var/www/html/.htpasswd
-Require valid-user
-EOF
-    chown $up_user:$up_user $sitedir/htaccess
+    # give the upload user access to the incoming directory.
+    # Do this recursively in case we're reinstalling and the
+    # upload user has been changed
+    chown -R $up_user:$up_user $inc_dir
+    chmod 775 $inc_dir
 
-    # touch the .htpasswd file for the site so that the user doesn't
-    # have to create it (so naive users don't get used to htpasswd -c)
-    touch $sitedir/.htpasswd
-    chown $up_user:$up_user $sitedir/.htpasswd
+    # allow PHP (running as the web server account) to modify the
+    # document root dir to set htaccess permissions
+    chown $up_user:www-data $site_dir
+    chmod 775 $site_dir
+
+    # create a directory to hold the PHP htaccess password management tool
+    # and allow it to change its own htaccess permissions
+    mk_dir $site_dir/users
+    chown $up_user:www-data $site_dir/users
+    chmod 775 $site_dir/users
+
+    # set any .ht* files to be owned by the web server (PHP) user.
+    # The cat masks the exit status of the ls
+    local hts="`ls $site_dir/.htaccess $site_dir/.htpasswd \
+        $site_dir/users/.htaccess $site_dir/users/.htpasswd 2> /dev/null \
+        | cat`"
+    for f in $hts
+    do
+        chown www-data:www-data $f
+    done
+
+    task="installing PHP"
+    echo "***** $task" | tee /dev/tty
+    install "php libapache2-mod-php"
+
+    # get the directory this script resides in
+    local our_dir=`dirname $(readlink -e "$0")`
+
+    # copy the htpasstool into its dir
+    cp $our_dir/../htpasstool/index.php $site_dir/users
+
+    # completely unclear why, but it seems to take two restarts for
+    # everything related to PHP and the htaccess mechanism to take effect.
+    # Leaving debugging to another day
+    systemctl restart apache2
+    systemctl restart apache2
 
     # configure for FTP upload 
     #
@@ -287,10 +317,6 @@ EOF
 
     install proftpd
         
-    # give the FTP user access to the incoming directory
-    chown -R $up_user:$up_user $inc_dir    
-    chmod 775 $inc_dir
-    
     # configure proftpd by editing its conf file
     #
     local cf=/etc/proftpd/proftpd.conf
@@ -320,13 +346,12 @@ EOF
     service proftpd restart
     rm -f /var/log/proftpd/proftpd.log* /var/log/proftpd/xferlog*
 
-    task="installing python and its imaging library"
+    task="installing Python and its imaging library"
     echo "***** $task" | tee /dev/tty
     install "python python-imaging"
 
     task="installing and configuring CommunityView server"
     echo "***** $task" | tee /dev/tty
-    local our_dir=`dirname $(readlink -e "$0")`
 
     # make the required dirs
     mk_dir $code_dir
