@@ -320,8 +320,8 @@ configure() {
     # configure proftpd by editing its conf file
     #
     local cf=/etc/proftpd/proftpd.conf
-    # limit FTP users to their login directory and below 
-    editnpconf $cf DefaultRoot '~'
+    # limit the upload user's group (==username) to the html subdir of /var/www
+    editnpconf $cf DefaultRoot "~/html $up_user"
     # all the upload user account to be used for FTP without a login shell
     editnpconf $cf RequireValidShell off
     # set the passive port range; must agree w/ firewall rules for this server
