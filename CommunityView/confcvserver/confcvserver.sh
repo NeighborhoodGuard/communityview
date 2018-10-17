@@ -168,7 +168,7 @@ editnpconf() {
     # Otherwise, append the name-value pair to the end of the file
     if grep -E "^[[:space:]]*$nm[[:space:]]+" "$cf" > /dev/null
     then
-        sed -i -r "/^([[:space:]]*)$nm([[:space:]]+).+$/s//\1$nm\2$val/" "$cf"
+        sed -i -r "/^([[:space:]]*)$nm([[:space:]]+).+$/s||\1$nm\2$val|" "$cf"
     else
         echo "$nm" "$val" >> "$cf"
     fi
