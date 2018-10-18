@@ -418,6 +418,19 @@ configure() {
     echo "***** $task" | tee /dev/tty
     systemctl --now mask accounts-daemon
 
+    task="checking private key for upload user account"
+    echo "***** $task" | tee /dev/tty
+    # generate a key for the upload user account if one does not exist,
+    # and add the public key to the account's auuthorized_keys
+    keyfile=$up_user_home/.ssh/id_rsa
+    if [ ! -f $keyfile ]
+    then
+        sudo -u $up_user -H ssh-keygen -q -f $up_user_home/.ssh/id_rsa -N ""
+        sudo -u $up_user -H sh -c \
+            "cat $keyfile.pub >> ~$up_user/.ssh/authorized_keys"
+        echo "(private key generated for $up_user in $keyfile)" | tee /dev/tty
+    fi
+
     # Turn off error trap
     set +e
     trap - EXIT
