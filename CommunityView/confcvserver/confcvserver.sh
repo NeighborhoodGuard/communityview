@@ -56,9 +56,6 @@ systemd_dir=/lib/systemd/system
 # log file for this script
 scriptlog=confcvserver.log
 
-# shell to use as a no-login shell for the upload machines's FTP account
-nologinshell=/bin/false
-
 # global to hold the name of the section that produced an unexpected error
 #
 task=""
@@ -239,14 +236,14 @@ configure() {
     echo "***** $task" | tee /dev/tty
 
     # if the upload user account exists, for safety's sake don't delete it,
-    # just make sure the home directory and password are correct
+    # just make sure the home directory, shell and password are correct
     #
     local up_user=`get_config $confile up_user`
     if id $up_user > /dev/null 2>&1
     then
-        usermod -d $up_user_home $up_user
+        usermod -d $up_user_home -s /bin/sh $up_user
     else
-        useradd -U -d $up_user_home $up_user
+        useradd -U -d $up_user_home -s /bin/sh $up_user
     fi
     echo "$up_user:`get_config $confile up_pass`" | chpasswd
 
@@ -260,6 +257,12 @@ configure() {
     # give the upload user access to its home directory
     chown $up_user:$up_user $up_user_home
     chmod 755 $up_user_home
+
+    # create the user's tunnel flags dir
+    fdir=$up_user_home/.tunnelflags
+    mk_dir $fdir
+    chown $up_user:$up_user $fdir
+    chmod 700 $fdir
 
     # give the upload user access to the incoming directory.
     # Do this recursively in case we're reinstalling and the
@@ -322,8 +325,6 @@ configure() {
     local cf=/etc/proftpd/proftpd.conf
     # limit the upload user's group (==username) to the html subdir of /var/www
     editnpconf $cf DefaultRoot "~/html $up_user"
-    # all the upload user account to be used for FTP without a login shell
-    editnpconf $cf RequireValidShell off
     # set the passive port range; must agree w/ firewall rules for this server
     editnpconf $cf PassivePorts "60000 60999"
     # if we're running in an AWS EC2 instance, get the public IP address
