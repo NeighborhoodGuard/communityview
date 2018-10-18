@@ -46,6 +46,7 @@ test_editnpconf_name_value_editing() {
     i=${i}'# next line is indented and contains multiple spaces\n'
     i=${i}'    PassivePorts    100    200\n'
     i=${i}'\tNameSurroundedByTabs\t100    200\n'
+    i=${i}'ExistingDirectiveWithSpecialChars ~\n'
     i=${i}'MasqueradeAddress blah\n'
     i=${i}'# End of initial conf file\n'
     local tcf=unit_test_temp_conf_file
@@ -58,6 +59,8 @@ test_editnpconf_name_value_editing() {
     editnpconf $tcf NameSurroundedByTabs "3   4"
     editnpconf $tcf RequireValidShell off
     editnpconf $tcf MasqueradeAddress 1.2.3.4
+    editnpconf $tcf NewDirectiveWithSpecialChars '~/fooagain baragain'
+    editnpconf $tcf ExistingDirectiveWithSpecialChars '~/foo bar'
 
     # excpected conf file after editing
     o=${o}'# Test conf file\n'
@@ -65,10 +68,12 @@ test_editnpconf_name_value_editing() {
     o=${o}'# next line is indented and contains multiple spaces\n'
     o=${o}'    PassivePorts    60000 60999\n'
     o=${o}'\tNameSurroundedByTabs\t3   4\n'
+    o=${o}'ExistingDirectiveWithSpecialChars ~/foo bar\n'
     o=${o}'MasqueradeAddress 1.2.3.4\n'
     o=${o}'# End of initial conf file\n'
     o=${o}'DefaultRoot ~\n'
     o=${o}'RequireValidShell off\n'
+    o=${o}'NewDirectiveWithSpecialChars ~/fooagain baragain\n'
     local tef=unit_test_temp_expctd_file
     /bin/echo -ne "$o" > $tef
 
