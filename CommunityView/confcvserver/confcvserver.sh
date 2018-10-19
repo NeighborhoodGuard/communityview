@@ -421,14 +421,20 @@ configure() {
     task="checking private key for upload user account"
     echo "***** $task" | tee /dev/tty
     # generate a key for the upload user account if one does not exist,
-    # and add the public key to the account's auuthorized_keys
-    keyfile=$up_user_home/.ssh/id_rsa
-    if [ ! -f $keyfile ]
+    # and add the public key to the account's authorized_keys
+    local privkey=$up_user_home/.ssh/$up_user.pem
+    local pubkey=$up_user_home/.ssh/$up_user.pub
+    local luser=`getluser`
+    if [ ! -f $privkey ]
     then
-        sudo -u $up_user -H ssh-keygen -q -f $up_user_home/.ssh/id_rsa -N ""
+        sudo -u $up_user -H ssh-keygen -q -f $privkey -N ""
+        mv $privkey.pub $pubkey
         sudo -u $up_user -H sh -c \
-            "cat $keyfile.pub >> ~$up_user/.ssh/authorized_keys"
-        echo "(private key generated for $up_user in $keyfile)" | tee /dev/tty
+            "cat $pubkey >> ~$up_user/.ssh/authorized_keys"
+        cp $privkey $our_dir
+        chown $luser:$luser $our_dir/$up_user.pem
+        echo "(private key generated for $up_user in $our_dir/$up_user.pem)" \
+            | tee /dev/tty
     fi
 
     # Turn off error trap
