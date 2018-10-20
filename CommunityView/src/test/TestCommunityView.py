@@ -30,6 +30,7 @@ import os
 import shutil
 import inspect
 import datetime
+import platform
 
 moduleUnderTest = communityview
 
@@ -265,16 +266,21 @@ class TestSurveilleance(unittest.TestCase):
         cam = moduleUnderTest.cameras[0]
         indir = os.path.join(moduleUnderTest.root, "2013-07-01", cam.shortname)
         os.makedirs(os.path.join(indir, "hires"))
-        
+
+        # only Windows has or requires O_BINARY
+        bin = 0
+        if platform.system() == "Windows":
+            bin = os.O_BINARY
+
         # put a fragment of a test jpg in the indir
         tfn = "SampleImage.jpg"
-        tfd = os.open(tfn, os.O_RDONLY|os.O_BINARY)
+        tfd = os.open(tfn, os.O_RDONLY|bin)
         buf = os.read(tfd, 8192)
         logging.info("test00CropFail(): buf size is %d" % len(buf))
         os.close(tfd)
         ifn = "12-00-01-12345.jpg"
         ifp = os.path.join(indir, ifn)
-        infd = os.open(ifp, os.O_WRONLY|os.O_BINARY|os.O_CREAT)
+        infd = os.open(ifp, os.O_WRONLY|bin|os.O_CREAT)
         os.write(infd, buf)
         os.fsync(infd)
         os.close(infd)
