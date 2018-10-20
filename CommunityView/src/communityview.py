@@ -40,6 +40,7 @@ import re
 import threading
 import time
 import logging.handlers
+import stats
 
 from localsettings import * #@UnusedWildImport (Camera)
 
@@ -229,10 +230,12 @@ def processImage(indir, filename, cam, master_image=None):
                     logging.error("Cannot save thumbnail %s" % thumbpathfilename)
     
       
-        # done processing, move raw file to storage, so we won't process it again.
+        # done processing, capture the stats, move raw file to storage so we
+        # won't process it again.
         #
         infilepathfilename = inpath(indir, filename)
         hirespathfilename = hirespath(indir, filename)
+        stats.proc_stats(infilepathfilename)
         
         # if this is a file we can't crop, we're now giving up on ever being
         # able to crop it by moving it to hires.  Log as an error
@@ -863,6 +866,7 @@ def main():
     
     set_up_logging()
     logging.info("Program Started, version %s", version_string)
+    stats.restart_stats()
 
     try:
         # Setup the threads, don't actually run them yet.
@@ -870,6 +874,7 @@ def main():
         processtoday_thread = threading.Thread(target=processtoday, args=())
     
         purge_thread = threading.Thread(target=purge_images, args=())
+        stats_thread = None
     
         while True:
             images_to_process = False   # only for testing purposes
@@ -877,6 +882,11 @@ def main():
             daydirs = get_daydirs()
     
             files_to_purge = len(daydirs) > retain_days
+            
+            if not (stats_thread and stats_thread.is_alive()):
+                stats_thread = threading.Thread(target=stats.stats_loop, \
+                                                args=(cameras,))
+                stats_thread.start()
             
             if len(daydirs) > retain_days:
                 if not purge_thread.is_alive():
