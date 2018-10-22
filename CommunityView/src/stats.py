@@ -20,7 +20,7 @@
 #
 ################################################################################
 
-from localsettings import incrootpath # and lwebrootpath when there is one
+from localsettings import root # and lwebrootpath when there is one
 import threading
 import os.path
 import csv
@@ -49,7 +49,7 @@ class StatsError(Exception):
 # 
 
 # XXX hack for initial implementation on old CommunityView
-lwebrootpath = incrootpath
+lwebrootpath = root
 
 statspath = os.path.join(lwebrootpath, "stats")
 
@@ -287,4 +287,3 @@ def stats_loop(cameras):
         if terminate_stats_loop:
             return
 
-    

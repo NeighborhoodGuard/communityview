@@ -510,7 +510,6 @@ def process_sequence(indir, sequences, cam, sequence_index):
         make_image_html(indir, sequences, sequence_index, image_index)
 
     return
-<<<<<<< HEAD
 
 
 def dir2date(indir):

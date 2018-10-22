@@ -165,10 +165,10 @@ def validateWebsite(image_tree):
     success = True
     root = moduleUnderTest.root
 
-    assert file_has_data(os.path.join(incroot, "index.html"))
+    assert file_has_data(os.path.join(root, "index.html"))
     
-    incrootdirlist = os.listdir(incroot)
-    if len(incrootdirlist) > len(inc_image_tree)+2: # +2: index.html, stats
+    rootdirlist = os.listdir(root)
+    if len(rootdirlist) > len(image_tree)+2: # +2: index.html, stats
         success = False
         logging.error("Extraneous file(s) in %s: %s" % (root, rootdirlist))
         
