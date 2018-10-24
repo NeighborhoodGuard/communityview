@@ -30,6 +30,7 @@ from utils import dir2date, file2time, get_daydirs, get_images_in_dir, \
 import time
 import logging
 import platform
+import re
 
 
 # general exception for stats problems
@@ -287,6 +288,23 @@ def restart_stats():
     if not os.path.isdir(statspath):
         os.mkdir(statspath)
     pass
+
+def expire_stats(retain_days):
+    """Retain the number of days of stats files specified by retain_days,
+    if extant, and remove any stats files from earlier days."""
+    files = os.listdir(statspath)
+    mobjs = [re.search(r"^(\d\d\d\d-\d\d-\d\d)_.*\.csv",f) for f in files]
+    statsdates = sorted(list(set([m.group(1) for m in mobjs if m])))
+    # if there are more stats file dates than the number we're supposed to
+    # retain, delete the out-of-date files
+    if len(statsdates) > retain_days:
+        # find the earliest date for which stats should be retained
+        retain_date = statsdates[-retain_days]
+        # delete the stats files earlier than the retain date
+        for f in sorted([m.group(0) for m in mobjs if m]):
+            if re.search("^"+retain_date, f):
+                break
+            os.remove(os.path.join(statspath, f))
     
 # Flag to stop the stats loop for test purposes.
 # Only for manipulation by testing code; always set to False in this file

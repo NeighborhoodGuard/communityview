@@ -879,7 +879,11 @@ def main():
                 if not purge_thread.is_alive():
                     purge_thread = threading.Thread(target=purge_images, args=(daydirs[:-retain_days],))
                     purge_thread.start()
-    
+
+                # since we have images to purge, we probably need to purge
+                # stats files, too
+                stats.expire_stats(retain_days)
+
                 daydirs = daydirs[-retain_days:] # only move forward with the daydirs that are not about to be deleted.
     
             # reverse sort the days so that most recent day is first

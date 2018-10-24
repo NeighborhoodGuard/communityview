@@ -205,6 +205,64 @@ class TestStats(unittest.TestCase):
                 "Should have been %d, %d." % \
                 (trow[stats.NUNPROC], trow[stats.NUNPROCPREV], 3, 9)
 
+    def test030expire_stats(self):
+        """Test to see that expire_stats deletes the correct files."""
+        to_be_deleted = [
+            "2000-01-01_cam1.csv",
+            "2000-01-01_cam2.csv",
+            "2000-01-02_cam1.csv",
+            "2000-01-02_cam2.csv",
+            ]
+        to_be_retained = [
+            "2000-01-03_cam1.csv",
+            "2000-01-03_cam2.csv",
+            "2000-01-04_cam1.csv",
+            "2000-01-04_cam2.csv",
+            "2000-01-05_cam1.csv",
+            "2000-01-05_cam2.csv",
+            ]
+        to_be_ignored = [
+            "things",
+            "stuff"
+            ]
+        # create the test files
+        for f in to_be_deleted + to_be_retained + to_be_ignored:
+            open(os.path.join(stats.statspath, f), 'a').close
+
+        stats.expire_stats(3)
+
+        # check the result
+        expected = sorted(to_be_retained + to_be_ignored)
+        result = sorted(os.listdir(stats.statspath))
+        if result != expected:
+            print "Result[", len(result), "]:\n", result
+            print "Expected[", len(expected), "]:\n", expected
+            self.fail("Fails files-to-be-expired test")
+
+        # test the case where nothing should be deleted
+        stats.expire_stats(3)
+
+        # check the result
+        if result != expected:
+            print "Result[", len(result), "]:\n", result
+            print "Expected[", len(expected), "]:\n", expected
+            self.fail("Fails no-need-to-remove-files test")
+
+        # remove the earliest day's files
+        os.remove(os.path.join(stats.statspath, expected.pop(0)))
+        os.remove(os.path.join(stats.statspath, expected.pop(0)))
+
+        # test the case where more stats files are allowed than are present
+        stats.expire_stats(3)
+
+        # check the result
+        result = sorted(os.listdir(stats.statspath))
+        if result != expected:
+            print "Result[", len(result), "]:\n", result
+            print "Expected[", len(expected), "]:\n", expected
+            self.fail("Fails more-files-allowed-than-extant test")
+
+
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testStats']
     unittest.main()
