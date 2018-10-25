@@ -365,7 +365,15 @@ configure() {
     cp $our_dir/../src/localsettings.py $code_dir
     cp $our_dir/../src/baseclasses.py $code_dir
     cp $our_dir/../src/communityview.py $code_dir
-    
+    cp $our_dir/../src/utils.py $code_dir
+    cp $our_dir/../src/stats.py $code_dir
+
+    local perf_dir=$site_dir/perf
+    mk_dir $perf_dir
+    chown $up_user:$up_user $perf_dir
+    cp $our_dir/../src/stats.html $perf_dir/index.html
+    cp $our_dir/../dygraphs/dygraph-combined.js $perf_dir
+
     # edit the code to set config values :-P
     #
     set_config_value $code_dir/localsettings.py root "\"$inc_dir\""
@@ -374,9 +382,11 @@ configure() {
     set_config_value $code_dir/localsettings.py logfile_max_days "$retain_days"
 
     # for each "cameraN" spec in conf file, add a camera def to settings file
+    # and assemble the cameras.js file for the stats webpage
     local cam
     local cnum=1
     local camlist=""
+    local camjs=""
     while true
     do
         cam=`get_config $confile "camera$cnum"`
@@ -387,11 +397,17 @@ configure() {
         sname=`echo "$cam" | sed 's/ .*//'`
         lname=`echo "$cam" | sed 's/^[^ ][^ ]*  *//'`
         camlist="$camlist    camera(\"$sname\", \"$lname\"),\n"
+        if [ ! -z "$camjs" ]
+        then
+            camjs="$camjs, "
+        fi
+        camjs="$camjs\"$sname\""
         cnum=`expr $cnum + 1`
     done
     sed --in-place "/^    camera(/,/[^ ]*\]/d" $code_dir/localsettings.py
     sed --in-place "/^cameras *= *\\[/a\\$camlist    ]" \
         $code_dir/localsettings.py 
+    echo "cameras = [ $camjs ];" > $perf_dir/cameras.js
 
     # install the communityview service file
     # and start the service
