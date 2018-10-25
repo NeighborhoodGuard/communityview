@@ -595,14 +595,14 @@ def get_images_in_dir(indir):
     images = []
 
     if os.path.isdir(indir):
-        logging.info("loading dirlist for %s" % indir)
+        logging.debug("loading dirlist for %s" % indir)
         origfiles = os.listdir(indir)
 
         for origfile in origfiles:
             if origfile.lower().endswith(".jpg"):
                 images.append(origfile)
 
-        logging.info("sorting dirlist for %s" % indir)
+        logging.debug("sorting dirlist for %s" % indir)
         images=sorted(images)
     return images
 
