@@ -1,0 +1,240 @@
+<html>
+<head>
+<script type="text/javascript"
+ src="dygraph-combined.js"></script>
+<script type="text/javascript" src="cameras.js"></script>
+<script type="text/javascript">
+graphs = [];
+data_colors = ["green", "cyan", "blue", "purple", "magenta", "red", "orange"];
+
+  function dcgraph(dcdate, camidx)
+  {
+	  camera = cameras[camidx];
+	  graphs[camidx] = new Dygraph(
+
+	    // containing div
+	    document.getElementById(camera+"_div"),
+
+	    // CSV or path to a CSV file.
+	    dcdate + "_" + camera + ".csv",
+	    {
+		title: dcdate + " -- " + camera,
+		xlabel: "Time",
+		ylabel: "Images/Min & Latency (Min)",
+		y2label: "Unprocessed Images",
+		rollPeriod: 10,
+		showRoller: true,
+		labelsSeparateLines: true,
+		labelsDiv: camera+"_l_div",
+		colors: data_colors,
+		series : {
+			"Unprocessed Images":{
+			    axis: "y2"
+			},
+			"Previous Days' Unprocessed Images":{
+			    axis: "y2"
+			}
+		},
+		axes: {
+			y2: {
+				labelsKMB: true,
+				drawGrid: true,
+				gridLinePattern: [2,8],
+				independentTicks: true
+			}
+		},
+		visibility: getVisSwitches(),
+
+	drawCallback: function(g)
+		{
+			drawVisSwitches(g);
+		},
+	    }
+
+	  );
+
+  }
+
+  function drawVisSwitches(g)
+  {
+	sdiv = document.getElementById("switches_div");
+	if ( sdiv.innerHTML.length == 0 ) // if div empty
+	{
+		var l = g.getLabels();
+		var t = "";
+		for (i=1; i<l.length; i++)
+		{
+			//t += "<font color='" + data_colors[i-1] + "'>" + l[i] + "</font><br>";
+			// checkboxes
+			cb = document.createElement("input");
+			cb.type = "checkbox";
+			cb.id = "" + (i-1);
+			cb.checked = true;
+			sdiv.appendChild(cb);
+			cb.setAttribute("onchange", "vis_data(this)");  //XXX
+
+			// checkbox labels
+			cbl = document.createElement("label");
+			cbl.style = "color:" + data_colors[i-1];
+			cbl.htmlFor = "" + (i-1);
+			cbl.appendChild(document.createTextNode(l[i]));
+			sdiv.appendChild(cbl);
+			sdiv.appendChild(document.createElement("br"));
+		}
+		//sdiv.innerHTML = t
+		var all = document.createElement("input");
+		all.setAttribute("type", "button");
+		all.setAttribute("value", "All");
+		all.setAttribute("onclick", "toggleAll()");
+		sdiv.appendChild(all);
+	}
+  }
+
+  function toggleAll()
+  {
+	var newstate = ! document.getElementById("0").checked;
+	for( var i=0; i<data_colors.length; i++ )
+	{
+		document.getElementById(""+i).checked = newstate;
+	}
+	setVisFromSwitches();
+  }
+
+
+  // return the state of the visibility switches as a boolean array
+  // XXX should relate to number of switches rather than data colors
+  function getVisSwitches()
+  {
+	var vis = [];
+
+	// if the switches don't exist yet, set all visibilities to true
+	sdiv = document.getElementById("switches_div");
+	if (sdiv.innerHTML.length == 0)
+	{
+		for( var i=0; i<data_colors.length; i++ )
+		{
+			vis[i] = true;
+		}
+	} else {
+		for( var i=0; i<data_colors.length; i++ )
+		{
+			vis[i] = document.getElementById(""+i).checked;
+		}
+	}
+  	return vis;
+  }
+
+  function setVisFromSwitches()
+  {
+	var vis = getVisSwitches();
+	for (var i=0; i<graphs.length; i++ )
+	{
+		for( var j=0; j<data_colors.length; j++)
+		{
+			graphs[i].setVisibility( j, vis[j] );
+		}
+  	}
+  }
+
+  
+  // XXX
+  // when a visibility checkbox is changes, this function is called to
+  // set the corresponding data plot on each graph visible or hidden
+  function vis_data(cb)
+  {
+	var cbn = parseInt(cb.id);
+	for( var i=0; i<cameras.length; i++ )
+	{
+		graphs[i].setVisibility(cbn, cb.checked);
+  	}
+  }
+</script>
+<script type="text/javascript">
+  function setup_divs()
+  {
+	var tab = document.createElement("table");
+	for (i=0; i<cameras.length; i++ )
+	{
+		var row = tab.insertRow(i);
+
+		// graph area
+		var re = row.insertCell(0);
+		var div = document.createElement("div");
+		div.id = cameras[i]+"_div";
+		div.style.width = "700px";
+		div.style.height = "200px";
+		//document.body.appendChild(div);
+		re.appendChild(div);
+
+		// legend area
+		re = row.insertCell(1);
+		div = document.createElement("div");
+		div.id = cameras[i]+"_l_div";
+		div.style.width = "300px";
+		div.style.height = "200px";
+		re.appendChild(div);
+		
+	}
+	document.body.appendChild(tab);
+  }
+
+  function drawgraphs(date)
+  {
+	for (i=0; i<cameras.length; i++ )
+	{
+		window.dcgraph(date, i);
+  	}
+  }
+
+  function react(e, value)
+  {
+	if(e.keyCode==13)
+	{
+		drawgraphs(value)
+	}
+  }
+
+</script>
+<script>
+	function gettoday()
+	{
+		var today = new Date();
+		var yyyy = today.getFullYear();
+		var mm = today.getMonth()+1;
+		var dd = today.getDate();
+		var date = yyyy + "-" + twodigits(mm) + "-" + twodigits(dd);
+		return date;
+	}
+
+	function twodigits(num)
+	{
+		var s = num + "";
+		if (s.length < 2)
+			s = "0" + s;
+		return s;
+	}
+
+	function drawtoday()
+	{
+		var date = gettoday();
+		var e = document.getElementById("date");
+		e.value = date;
+		drawgraphs( date );
+	}
+
+	function drawfirsttime()
+	{
+		setup_divs();
+		drawtoday();
+	}
+	
+</script>
+</head>
+<body onload="drawfirsttime()">
+Date:
+<input id="date" type="text" size="8" onKeydown="react(event, this.value)">
+<!-- make sure there are zero chars in the initial switches_div -->
+<div id="switches_div"></div>
+
+</body>
+</html>
