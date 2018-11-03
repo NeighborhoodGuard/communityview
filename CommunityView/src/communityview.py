@@ -1,6 +1,6 @@
 ################################################################################
 #
-# Copyright (C) 2012-2014 Neighborhood Guard, Inc.  All rights reserved.
+# Copyright (C) 2012-2018 Neighborhood Guard, Inc.  All rights reserved.
 # Original author: Jesper Jurcenoks
 # 
 # This file is part of CommunityView.
@@ -57,7 +57,7 @@ delete=True
 thumbsize =(128,128)
 mediumsize = (800,600)
 title = "Neighborhood Guard CommunityView"
-footer = "Software Copyright (c) 2012-2014  Neighborhood Guard, Inc. All rights reserved."
+footer = "Software Copyright (c) 2012-2018  Neighborhood Guard, Inc. All rights reserved."
 
 
 

@@ -1,6 +1,6 @@
 ################################################################################
 #
-# Copyright (C) 2012-2014 Neighborhood Guard, Inc.  All rights reserved.
+# Copyright (C) 2012-2018 Neighborhood Guard, Inc.  All rights reserved.
 # Original authors: Jesper Jurcenoks and Douglas Kerr
 # 
 # This file is part of CommunityView.

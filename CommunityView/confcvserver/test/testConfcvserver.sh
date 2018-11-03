@@ -4,7 +4,7 @@
 # Copyright (C) 2018 Neighborhood Guard, Inc.  All rights reserved.
 # Original author: Douglas Kerr
 # 
-# This file is part of FTP_Upload.
+# This file is part of CommunityView.
 # 
 # FTP_Upload is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as published by
