@@ -235,10 +235,26 @@ configure() {
     task="creating the upload user account"
     echo "***** $task" | tee /dev/tty
 
-    # if the upload user account exists, for safety's sake don't delete it,
-    # just make sure the home directory, shell and password are correct
+    # if an upload user account already exists, see if it has the same
+    # name as the requested upload user account name.
+    # If not, change the user and group name of the existing account
+    # to the requested name
     #
+    local exupuser=`grep $up_user_home /etc/passwd | grep -v '^www-data:' \
+        | col1 :`
     local up_user=`get_config $confile up_user`
+    if [ -n "$exupuser" ]
+    then
+        if [ $exupuser != $up_user ]
+        then
+            usermod -l $up_user $exupuser
+            groupmod -n $up_user $exupuser
+        fi
+    fi
+
+    # if the upload user account exists, make sure the home directory,
+    # shell and password are correct, otherwise, create the account
+    #
     if id $up_user > /dev/null 2>&1
     then
         usermod -d $up_user_home -s /bin/sh $up_user
@@ -265,10 +281,20 @@ configure() {
     chmod 700 $fdir
 
     # give the upload user access to the incoming directory.
-    # Do this recursively in case we're reinstalling and the
-    # upload user has been changed
-    chown -R $up_user:$up_user $inc_dir
+    # Don't do this recursively in case we're reinstalling and there
+    # are gigabytes worth of files to change on a slow disk.
+    # Assume the files below this point are OK, except for the ones
+    # we're going to change below
+    chown $up_user:$up_user $inc_dir
     chmod 775 $inc_dir
+
+    # make the index page installed by Apache owned by CommunityView user
+    local index=$site_dir/index.html
+    if [ -e $index ]
+    then
+        chown $up_user:$up_user $index
+        chmod 775 $index
+    fi
 
     # allow PHP (running as the web server account) to modify the
     # document root dir to set htaccess permissions
