@@ -31,7 +31,6 @@ import datetime
 import time
 from testutils import filename_to_time, dirname_to_datetime
 import shutil
-import communityview    # see test020minute_stats() below
 
 class MockTime():
     """Monkey patch time.time() to return a timestamp set by set_time()."""
@@ -105,6 +104,10 @@ class TestStats(unittest.TestCase):
         return test_now
     
     def test000proc_stats(self):
+        """Test proc_stats() and verify tallies.
+        This includes number of files created,
+        uploaded and processed, as well as average upload and processing 
+        latencies. Do this for both the datecam tables and per-server tables."""
         datecam = ("2014-07-01", "cam1")
         fnprefix = "00-01-00"
         nfiles = 5
@@ -112,24 +115,35 @@ class TestStats(unittest.TestCase):
         proclat = 6
         test_now = self.call_proc_stats(datecam, fnprefix, nfiles, uplat, 
                                         proclat)
-
-        keys = stats.statdict.keys()
-        for k in keys:
-            print str(k)
-            table = stats.statdict[k][stats.TABLE]
-            for i in range(12):
-                print table[i]
-            print
         
-        # upload latency statistics
+        # duplicate this test data on a second camera to test per-server summary
+        datecam2 = (datecam[0], "cam2")
+        self.call_proc_stats(datecam2, fnprefix, nfiles, uplat, proclat)
+
+        # dump the first few lines of each table for debug purposes
+        if False:
+            keys = stats.statdict.keys()
+            for k in keys:
+                print str(k)
+                table = stats.statdict[k][stats.TABLE]
+                for i in range(12):
+                    print table[i]
+                print
+
+        # upload latency statistics for datecam and per-server tables
         uplat_table = stats.statdict[datecam][stats.TABLE]
         uplat_row = filename_to_time(fnprefix).seconds/60
         assert uplat_table[uplat_row][stats.NCREATE] == nfiles, "%d, %d" \
                 % (uplat_table[uplat_row][stats.NCREATE], nfiles)
         assert uplat_table[uplat_row][stats.AVGUPLAT] == uplat, "%d, %d" \
                 % (uplat_table[uplat_row][stats.AVGUPLAT], uplat)
+        uplat_table = stats.statdict[(datecam[0],"")][stats.TABLE]
+        assert uplat_table[uplat_row][stats.NCREATE] == nfiles*2, "%d, %d" \
+                % (uplat_table[uplat_row][stats.NCREATE], nfiles*2)
+        assert uplat_table[uplat_row][stats.AVGUPLAT] == uplat, "%d, %d" \
+                % (uplat_table[uplat_row][stats.AVGUPLAT], uplat)
                     
-        # processing latency statistics
+        # processing latency statistics for datecam and per-server tables
         uplat_td = datetime.timedelta(minutes=uplat)
         upload_date = (dirname_to_datetime(datecam[0]) + uplat_td) \
                          .strftime("%Y-%m-%d")
@@ -139,71 +153,89 @@ class TestStats(unittest.TestCase):
                 % (proclat_table[proclat_row][stats.NUPLOAD], nfiles)
         assert proclat_table[proclat_row][stats.AVGPROCLAT] == proclat,"%d, %d"\
                 % (proclat_table[proclat_row][stats.AVGPROCLAT], proclat)
+        proclat_table = stats.statdict[(upload_date, "")][stats.TABLE]
+        assert proclat_table[proclat_row][stats.NUPLOAD] == nfiles*2, "%d, %d" \
+                % (proclat_table[proclat_row][stats.NUPLOAD], nfiles*2)
+        assert proclat_table[proclat_row][stats.AVGPROCLAT] == proclat,"%d, %d"\
+                % (proclat_table[proclat_row][stats.AVGPROCLAT], proclat)
                 
         # count of files processed during the minute the test considers as "now"
+        #  for datecam and per-server tables
         now_tm = time.localtime(test_now)
         now_datecam = (time.strftime("%Y-%m-%d", now_tm), datecam[1])
         now_table = stats.statdict[now_datecam][stats.TABLE]
         now_row = now_tm.tm_hour*60 + now_tm.tm_min
         assert now_table[now_row][stats.NPROC] == nfiles, "%d, %d" \
                 % (now_table[now_row][stats.NPROC], nfiles)
+        now_table = stats.statdict[(now_datecam[0],"")][stats.TABLE]
+        assert now_table[now_row][stats.NPROC] == nfiles*2, "%d, %d" \
+                % (now_table[now_row][stats.NPROC], nfiles*2)
         
     def test010writereadstatsfile(self):
-        # DEPENDS ON RUNNING PREVIOUS TEST
-        
-        # write tables out to filesystem
-        datecam1 = ("2014-07-01", "cam1")
-        stats.write_dctable(datecam1)
-        datecam2 = ("2014-07-02", "cam1")
-        stats.write_dctable(datecam2)
-        
-        # move the tables in memory to new keys so files can be read back in
-        # without disturbing the original tables
-        datecam1orig = ("2015-07-01", "cam1")
-        datecam2orig = ("2015-07-02", "cam1")
-        stats.statdict[datecam1orig] = stats.statdict[datecam1]
-        stats.statdict[datecam2orig] = stats.statdict[datecam2]
-        del stats.statdict[datecam1]
-        del stats.statdict[datecam2]
+        # DEPENDS ON RUNNING PREVIOUS TEST 
+        # to set up the datecam stats tables in memory
 
-        # read the files back into memory and compare with original tables
-        tests = ((datecam1, datecam1orig), (datecam2, datecam2orig))
-        for (new, orig) in tests:
-            (lock, newtable) = stats.lock_datecam(new)
+        # write the stats tables out to filesystem, then
+        # save the tables in memory to new keys so files can be read back in
+        # without disturbing the saved tables
+        tabkeys = (("2014-07-01", "cam1"),("2014-07-02", "cam1"),
+                   ("2014-07-01", ""),("2014-07-02", ""))
+        savkeys = (("2015-07-01", "cam1"),("2015-07-02", "cam1"),
+                   ("2015-07-01", ""),("2015-07-02", ""))
+        for i in range(len(tabkeys)):
+            stats.write_dctable(tabkeys[i])
+            stats.statdict[savkeys[i]] = stats.statdict[tabkeys[i]]
+            del stats.statdict[tabkeys[i]]
+
+        # read the files back into memory and compare with saved tables
+        for i in range(len(tabkeys)):
+            (lock, tab) = stats.lock_datecam(tabkeys[i])
             lock.release()
-            origtable = stats.statdict[orig][stats.TABLE]
+            sav = stats.statdict[savkeys[i]][stats.TABLE]
             for row in range(stats.MINPERDAY):
-                if newtable[row] != origtable[row]:
-                    print "Row %d  new: %s" % (row, newtable[row])
-                    print "Row %d orig: %s" % (row, origtable[row])
+                if tab[row] != sav[row]:
+                    print "Table", tab
+                    print "Row %d  new: %s" % (row, tab[row])
+                    print "Row %d orig: %s" % (row, sav[row])
                     assert False, "Newly read in table does not match original"
 
     def test020minute_stats(self):
         """Test minute_stats() tally of unprocessed files."""
-        # because minute_stats() uses get_daydirs() util in communityview :-P
-        communityview.root = stats.root 
-        
         shutil.rmtree(stats.root, False, None)
         os.mkdir(stats.root)
         os.mkdir(stats.statspath)   # XXX hack while statspath under root
-        datecamfiles = ((("2014-07-01", testsettings.cameras[0].shortname), 3),
-                        (("2014-06-30", testsettings.cameras[0].shortname), 4),
-                        (("2014-06-29", testsettings.cameras[0].shortname), 5))
+
+        # for each of two cameras, generate three image files for today,
+        # and nine for previous days
+        datecamfiles = ()
+        for i in range(2):
+            datecamfiles += \
+                ((("2014-07-01", testsettings.cameras[i].shortname), 3),
+                 (("2014-06-30", testsettings.cameras[i].shortname), 4),
+                 (("2014-06-29", testsettings.cameras[i].shortname), 5))
         for (datecam, nfiles) in datecamfiles:
             dcpath = os.path.join(stats.root, datecam[0], datecam[1])
             os.makedirs(dcpath)
             for i in range(nfiles): # create nfiles files in the datecam dir
                 open(os.path.join(dcpath, "%05d.jpg" % i), 'a').close()
-        
+
         test_min = 3
         test_now = time.mktime(datetime.datetime(2014, 7, 1, 0, test_min, 0) \
                                .timetuple())
         stats.minute_stats(test_now, testsettings.cameras)
+
+        # check the tally of unprocessed files for the first camera
         trow = stats.statdict[datecamfiles[0][0]][stats.TABLE][test_min]
         assert trow[stats.NUNPROC] == 3 and trow[stats.NUNPROCPREV] == 9, \
-                "Wrong count of unprocessed files: today: %d, prev: %d. " \
-                "Should have been %d, %d." % \
+                "Wrong count of single camera's unprocessed files: " \
+                "today: %d, prev: %d. Should have been %d, %d." % \
                 (trow[stats.NUNPROC], trow[stats.NUNPROCPREV], 3, 9)
+        # check the tally of unprocessed files for the whole server
+        trow = stats.statdict[(datecamfiles[0][0][0],"")][stats.TABLE][test_min]
+        assert trow[stats.NUNPROC] == 3*2 and trow[stats.NUNPROCPREV] == 9*2, \
+                "Wrong per-server count of unprocessed files: " \
+                "today: %d, prev: %d. Should have been %d, %d." % \
+                (trow[stats.NUNPROC], trow[stats.NUNPROCPREV], 3*2, 9*2)
 
     def test030expire_stats(self):
         """Test to see that expire_stats deletes the correct files."""
@@ -212,6 +244,8 @@ class TestStats(unittest.TestCase):
             "2000-01-01_cam2.csv",
             "2000-01-02_cam1.csv",
             "2000-01-02_cam2.csv",
+            "2000-01-01_.csv",
+            "2000-01-02_.csv",
             ]
         to_be_retained = [
             "2000-01-03_cam1.csv",
@@ -220,6 +254,9 @@ class TestStats(unittest.TestCase):
             "2000-01-04_cam2.csv",
             "2000-01-05_cam1.csv",
             "2000-01-05_cam2.csv",
+            "2000-01-03_.csv",
+            "2000-01-04_.csv",
+            "2000-01-05_.csv",
             ]
         to_be_ignored = [
             "things",
@@ -249,6 +286,7 @@ class TestStats(unittest.TestCase):
             self.fail("Fails no-need-to-remove-files test")
 
         # remove the earliest day's files
+        os.remove(os.path.join(stats.statspath, expected.pop(0)))
         os.remove(os.path.join(stats.statspath, expected.pop(0)))
         os.remove(os.path.join(stats.statspath, expected.pop(0)))
 

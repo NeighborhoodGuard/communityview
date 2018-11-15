@@ -27,28 +27,29 @@
  src="dygraph-combined.js"></script>
 <script type="text/javascript" src="cameras.js"></script>
 <script type="text/javascript">
-graphs = [];
+dygraphs = [];
+gnames = [];
 data_colors = ["green", "cyan", "blue", "purple", "magenta", "red", "orange"];
 
-  function dcgraph(dcdate, camidx)
+  function dcgraph(dcdate, gindex)
   {
-	  camera = cameras[camidx];
-	  graphs[camidx] = new Dygraph(
+	  gname = gnames[gindex];
+	  dygraphs[gindex] = new Dygraph(
 
 	    // containing div
-	    document.getElementById(camera+"_div"),
+	    document.getElementById(gname+"_div"),
 
 	    // CSV or path to a CSV file.
-	    dcdate + "_" + camera + ".csv",
+	    dcdate + "_" + (gname=="ServerTotals" ? "" : gname) + ".csv",
 	    {
-		title: dcdate + " -- " + camera,
+		title: dcdate + " -- " + gname,
 		xlabel: "Time",
 		ylabel: "Images/Min & Latency (Min)",
 		y2label: "Unprocessed Images",
 		rollPeriod: 10,
 		showRoller: true,
 		labelsSeparateLines: true,
-		labelsDiv: camera+"_l_div",
+		labelsDiv: gname+"_l_div",
 		colors: data_colors,
 		series : {
 			"Unprocessed Images":{
@@ -150,11 +151,11 @@ data_colors = ["green", "cyan", "blue", "purple", "magenta", "red", "orange"];
   function setVisFromSwitches()
   {
 	var vis = getVisSwitches();
-	for (var i=0; i<graphs.length; i++ )
+	for (var i=0; i<dygraphs.length; i++ )
 	{
 		for( var j=0; j<data_colors.length; j++)
 		{
-			graphs[i].setVisibility( j, vis[j] );
+			dygraphs[i].setVisibility( j, vis[j] );
 		}
   	}
   }
@@ -166,9 +167,9 @@ data_colors = ["green", "cyan", "blue", "purple", "magenta", "red", "orange"];
   function vis_data(cb)
   {
 	var cbn = parseInt(cb.id);
-	for( var i=0; i<cameras.length; i++ )
+	for( var i=0; i<gnames.length; i++ )
 	{
-		graphs[i].setVisibility(cbn, cb.checked);
+		dygraphs[i].setVisibility(cbn, cb.checked);
   	}
   }
 </script>
@@ -176,14 +177,14 @@ data_colors = ["green", "cyan", "blue", "purple", "magenta", "red", "orange"];
   function setup_divs()
   {
 	var tab = document.createElement("table");
-	for (i=0; i<cameras.length; i++ )
+	for (i=0; i<gnames.length; i++ )
 	{
 		var row = tab.insertRow(i);
 
 		// graph area
 		var re = row.insertCell(0);
 		var div = document.createElement("div");
-		div.id = cameras[i]+"_div";
+		div.id = gnames[i]+"_div";
 		div.style.width = "700px";
 		div.style.height = "200px";
 		//document.body.appendChild(div);
@@ -192,7 +193,7 @@ data_colors = ["green", "cyan", "blue", "purple", "magenta", "red", "orange"];
 		// legend area
 		re = row.insertCell(1);
 		div = document.createElement("div");
-		div.id = cameras[i]+"_l_div";
+		div.id = gnames[i]+"_l_div";
 		div.style.width = "300px";
 		div.style.height = "200px";
 		re.appendChild(div);
@@ -203,7 +204,7 @@ data_colors = ["green", "cyan", "blue", "purple", "magenta", "red", "orange"];
 
   function drawgraphs(date)
   {
-	for (i=0; i<cameras.length; i++ )
+	for (i=0; i<gnames.length; i++ )
 	{
 		window.dcgraph(date, i);
   	}
@@ -247,6 +248,8 @@ data_colors = ["green", "cyan", "blue", "purple", "magenta", "red", "orange"];
 
 	function drawfirsttime()
 	{
+                gnames = cameras.slice();
+                gnames.push("ServerTotals");
 		setup_divs();
 		drawtoday();
 	}

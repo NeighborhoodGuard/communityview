@@ -63,6 +63,9 @@ statdict = {}
 # in memory
 dictlock = threading.RLock()
 
+# true when the server was restarted during the current minute
+restarted = False
+
 # datecam and per-server tables statdict:
 # top level is list: [RLock, table, changed]
 LOCK = 0
@@ -80,19 +83,20 @@ NUNPROCPREV = 6 # number of unprocessed files from previous days at this minute
 
 LENDCROW    = 7 # length of the datecam table row
 
+# extra columns in per-server table
+RESTARTED   = 7 # non-zero if server restarted during this minute
+NERRORS     = 8 # future use: count of ERROR-level events during this minute
+
+LENPSROW    = 9 # length of the per-server table row
+
 # datecam CSV file column headers
 DCCSVHEADERS = ("Time", "Images Created/Min", "Upload Latency", 
                 "Images Uploaded/Min", "Processing Latency",
-                "Images Processed/Min", "Unprocessed Images", 
+                "Images Processed/Min", "Today's Unprocessed Images", 
                 "Previous Days' Unprocessed Images")
 
-# per-server table in statdict:
-# same top level as datecam
-
-# per-server table (all cameras combined) column indicies
-RESTARTED   = 0     # non-zero if the server was restarted during this minute
-NPROCTOT    = 1     # total number of images processed during this minute
-NERRORS     = 2     # number of errors logged during this minute
+# extra column headers in per-server table
+PSCSVHEADERS = DCCSVHEADERS + ("Restarted", "Errors")
 
 # the number of rows in the datecam and server csv tables is equal to the number
 # of minutes in a day
@@ -115,17 +119,22 @@ def number(string):
         return float(string)
 
 def lock_datecam(datecam, changed=True):
-    """Insure the stats table for the datecam is in memory, and return a tuple
+    """Insure the stats table for the datecam or per-server (the summary table
+    for the whole server for the day) is in memory, and return a tuple
     consisting of an acquired RLock for accessing the table (which must be
     released when the thread is done accessing/updating the table) and the
     table. If there is no existing table file, initialize all table values to
     None.  It is assumed that the table is being retrieved in order to make
-    changes. If the changed flag is set (default) the table will be marked to be
-    written to the filesystem at the next one-minute tick."""
+    changes, so the changed flag defaults to True. 
+    If the changed flag is set (default) the table will be marked to be
+    written to the filesystem at the next one-minute tick.  If datecam 
+    represents a per-server table, the "cam" part of the datecam is an
+    empty string."""
+    is_ps = datecam[1]==""
     dictlock.acquire() 
     if datecam not in statdict:
         # begin with an empty table
-        trow = [None] * LENDCROW
+        trow = [None] * (LENPSROW if is_ps else LENDCROW)
         table = [None] * MINPERDAY  # initialization optimization
         table = [list(trow) for _ in range(MINPERDAY)]
         statdict[datecam] = [threading.RLock(), table,  changed]
@@ -143,7 +152,7 @@ def lock_datecam(datecam, changed=True):
                     if hh:  # skip the header row
                         hh = False
                         continue
-                    if len(csvrow) != LENDCROW+1:
+                    if len(csvrow) != (LENPSROW if is_ps else LENDCROW) + 1:
                         raise StatsError("%s: line %d: wrong number of fields" \
                                 % (fp, rindex+1))
                     csvrow = csvrow[1:]     # remove the time field
@@ -172,12 +181,12 @@ def proc_stats(imagepath):
     (p, filename) = os.path.split(imagepath)
     (p, cam) = os.path.split(p)
     (_, date) = os.path.split(p)
-    datecam = (date, cam)
+    createdatecam = (date, cam)
     mtime = os.path.getmtime(imagepath)
 
     # the upload latency is recorded with respect to the time the image was
     # created, which is indicated by the image filename
-    (yr, mo, day) = dir2date(datecam[0])
+    (yr, mo, day) = dir2date(createdatecam[0])
     (hr, minute, sec) = file2time(filename)
     fndt = datetime.datetime(yr, mo, day, hr, minute, sec)
     createminute = hr*60 + minute
@@ -185,10 +194,23 @@ def proc_stats(imagepath):
     uplat = uplatdelta.days*24*60 + float(uplatdelta.seconds)/60
     if uplat < 0:
         logging.warn("upload latency is negative: %s %s: %d minutes" % \
-                         (datecam, filename, uplat))
+                         (createdatecam, filename, uplat))
         uplat = 0
-        
-    (lock, table) = lock_datecam(datecam)        
+
+    # datecam table for the image's creation date
+    (lock, table) = lock_datecam(createdatecam)        
+    row = table[createminute]
+    if row[NCREATE] is None:
+        row[NCREATE] = 0
+    if row[AVGUPLAT] is None:
+        row[AVGUPLAT] = 0.0
+    row[AVGUPLAT] = (row[AVGUPLAT] * row[NCREATE] + uplat) / (row[NCREATE] + 1)
+    row[NCREATE] += 1
+    zeroback(table, createminute, NCREATE)
+    lock.release()
+    
+    # per-server table for the image's creation date    datesrv = 
+    (lock, table) = lock_datecam((createdatecam[0],""))
     row = table[createminute]
     if row[NCREATE] is None:
         row[NCREATE] = 0
@@ -205,10 +227,24 @@ def proc_stats(imagepath):
     now = time.time()
     proclat = (now - mtime)/60
     mtime_tm = time.localtime(mtime)
-    uploaddatecam = (time.strftime("%Y-%m-%d", mtime_tm), datecam[1])
+    uploaddatecam = (time.strftime("%Y-%m-%d", mtime_tm), createdatecam[1])
     uploadminute = mtime_tm.tm_hour*60 + mtime_tm.tm_min
     
+    # datecam table for the image's upload date
     (lock, table) = lock_datecam(uploaddatecam)
+    row = table[uploadminute]
+    if row[NUPLOAD] is None:
+        row[NUPLOAD] = 0
+    if row[AVGPROCLAT] is None:
+        row[AVGPROCLAT] = 0.0
+    row[AVGPROCLAT] = (row[AVGPROCLAT] * row[NUPLOAD] + proclat) \
+                        / (row[NUPLOAD] + 1)
+    row[NUPLOAD] += 1
+    zeroback(table, uploadminute, NUPLOAD)
+    lock.release()
+    
+    # per-server table for the image's upload date
+    (lock, table) = lock_datecam((uploaddatecam[0],""))
     row = table[uploadminute]
     if row[NUPLOAD] is None:
         row[NUPLOAD] = 0
@@ -222,9 +258,10 @@ def proc_stats(imagepath):
     
     # the record the number of images processed this minute
     now_tm = time.localtime(now)
-    nowdatecam = (time.strftime("%Y-%m-%d", now_tm), datecam[1])
+    nowdatecam = (time.strftime("%Y-%m-%d", now_tm), createdatecam[1])
     nowminute = now_tm.tm_hour*60 + now_tm.tm_min
     
+    # datecam table for the image's processing date
     (lock, table) = lock_datecam(nowdatecam)
     if table[nowminute][NPROC] is None:
         table[nowminute][NPROC] = 0
@@ -232,19 +269,30 @@ def proc_stats(imagepath):
     zeroback(table, nowminute, NPROC)
     lock.release()
 
+    # per-server table for the image's processing date
+    (lock, table) = lock_datecam((nowdatecam[0],""))
+    if table[nowminute][NPROC] is None:
+        table[nowminute][NPROC] = 0
+    table[nowminute][NPROC] += 1
+    zeroback(table, nowminute, NPROC)
+    lock.release()
+
 def write_dctable(datecam):
-    """Write the specified datecam stats table out to the filesystem."""
+    """Write the specified datecam or per-server
+    stats table out to the filesystem."""
+    is_ps = datecam[1]==""
     fp = os.path.join(statspath, datecam_to_fn(datecam)+".temp")
     statdict[datecam][LOCK].acquire()
     with open(fp, "wb") as csvfile:
         writer = csv.writer(csvfile, delimiter=',', quotechar='"')
-        writer.writerow(DCCSVHEADERS)
+        writer.writerow(PSCSVHEADERS if is_ps else DCCSVHEADERS)
         
         for m in range(MINPERDAY):
             trow = statdict[datecam][TABLE][m]
-            csvrow = [None] * (LENDCROW + 1)
+            csvrow = [None] * (LENPSROW if is_ps else LENDCROW + 1)
             csvrow[0] = datecam[0] + " %02d:%02d" % (m/60, m%60)
-            csvrow[1:LENDCROW+1] = [str(x) if x!=None else None for x in trow]
+            csvrow[1:(LENPSROW if is_ps else LENDCROW)+1] = \
+                [str(x) if x!=None else None for x in trow]
             writer.writerow(csvrow)
     dcfilepath = os.path.join(statspath, datecam_to_fn(datecam))
     if platform.system() == "Windows":    # :-P no atomic move & replace
@@ -255,13 +303,15 @@ def write_dctable(datecam):
     statdict[datecam][LOCK].release()
     
 def minute_stats(timestamp, cameras):
-    # get count of unprocessed images for previous days and today
-    # write each changed stats table out to the filesystem
-    # write the stats page html
+    global restarted
+    # get count of unprocessed images for previous days and today.
+    # Write each changed stats table out to the filesystem
     ts_tm = time.localtime(timestamp)
     today = time.strftime("%Y-%m-%d", ts_tm)
     minute = ts_tm.tm_hour*60 + ts_tm.tm_min
     datepaths = get_daydirs()
+    unproctodayallcams = 0
+    unprocprevdaysallcams = 0
     for cam in cameras:
         unproctoday = 0
         unprocprevdays = 0
@@ -274,20 +324,32 @@ def minute_stats(timestamp, cameras):
                     unproctoday += n
                 else:
                     unprocprevdays += n
+        unproctodayallcams += unproctoday
+        unprocprevdaysallcams += unprocprevdays
+
         (lock, table) = lock_datecam((today, cam.shortname))
         table[minute][NUNPROC] = unproctoday
         table[minute][NUNPROCPREV] = unprocprevdays
         lock.release()
-    
+
+    # per-server table
+    (lock, table) = lock_datecam((today, ""))
+    table[minute][NUNPROC] = unproctodayallcams
+    table[minute][NUNPROCPREV] = unprocprevdaysallcams
+    if restarted:
+        table[minute][RESTARTED] = 1
+        restarted = False
+    lock.release()
+
     for k in statdict.keys():
-        if isinstance(k, tuple):    # if k is a datecam, not a server date
-            if statdict[k][CHANGED]:
-                write_dctable(k)
+        if statdict[k][CHANGED]:
+            write_dctable(k)
 
 def restart_stats():
+    global restarted
     if not os.path.isdir(statspath):
         os.mkdir(statspath)
-    pass
+    restarted = True
 
 def expire_stats(retain_days):
     """Retain the number of days of stats files specified by retain_days,
