@@ -11,7 +11,11 @@ Uploaded and processed images, and their associated Web pages, are stored for a 
 
 
 ### Installation and Configuration ###
-Please see the file `CommunityView/doc/InstallCommunityView.md` for installation and configuration information.
+
+For installation and configuration on a shared-hosting server, please see
+[CommunityView/doc/InstallCommunityView.md](CommunityView/doc/InstallCommunityView.md).  
+If you are installing on a dedicated server, please see 
+[CommunityView/doc/InstallCVDedicated.md](CommunityView/doc/InstallCVDedicated.md).
 
 ### License ###
 
