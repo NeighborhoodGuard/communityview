@@ -1,6 +1,6 @@
 ################################################################################
 #
-# Copyright (C) 2014 Neighborhood Guard, Inc.  All rights reserved.
+# Copyright (C) 2014-2018 Neighborhood Guard, Inc.  All rights reserved.
 # Original author: Douglas Kerr
 # 
 # This file is part of CommunityView.
@@ -21,8 +21,15 @@
 ################################################################################
 
 import unittest
-import communityview
 import testsettings
+import localsettings
+
+# Set up the testing values for the global config vars
+#
+localsettings.root                  = testsettings.root
+localsettings.cameras               = testsettings.cameras
+
+import communityview
 import time
 import threading
 import logging
@@ -30,6 +37,9 @@ import os
 import shutil
 import inspect
 import datetime
+import platform
+import stats
+from utils import is_thread_prefix
 
 moduleUnderTest = communityview
 
@@ -95,7 +105,8 @@ def deleteTestFiles():
     top-level directory of the CommunityView website (and is also used as the
     top directory for incoming images.
     """
-    shutil.rmtree(moduleUnderTest.root, False, None)
+    if os.path.isdir(moduleUnderTest.root):
+        shutil.rmtree(moduleUnderTest.root, False, None)
     os.mkdir(moduleUnderTest.root)
 
 
@@ -153,10 +164,11 @@ def file_has_data(path):
 def validateWebsite(image_tree):
     success = True
     root = moduleUnderTest.root
-    
+
     assert file_has_data(os.path.join(root, "index.html"))
+    
     rootdirlist = os.listdir(root)
-    if len(rootdirlist) > len(image_tree)+1:
+    if len(rootdirlist) > len(image_tree)+2: # +2: index.html, stats
         success = False
         logging.error("Extraneous file(s) in %s: %s" % (root, rootdirlist))
         
@@ -225,6 +237,8 @@ def validateWebsite(image_tree):
 class TestSurveilleance(unittest.TestCase):
 
     origThreadList = threading.enumerate()
+    stats_thread = None
+    stats_run = threading.Event()
 
     def setUp(self):
 
@@ -235,11 +249,6 @@ class TestSurveilleance(unittest.TestCase):
                 pass
         moduleUnderTest.set_up_logging()
         
-        # Set up the testing values for the communityview global vars
-        #
-        moduleUnderTest.cameras = testsettings.cameras
-        moduleUnderTest.root = testsettings.root
-       
         # override the datetime.date().today method
         datetime.date = ForceDate
            
@@ -265,16 +274,21 @@ class TestSurveilleance(unittest.TestCase):
         cam = moduleUnderTest.cameras[0]
         indir = os.path.join(moduleUnderTest.root, "2013-07-01", cam.shortname)
         os.makedirs(os.path.join(indir, "hires"))
-        
+
+        # only Windows has or requires O_BINARY
+        bin = 0
+        if platform.system() == "Windows":
+            bin = os.O_BINARY
+
         # put a fragment of a test jpg in the indir
         tfn = "SampleImage.jpg"
-        tfd = os.open(tfn, os.O_RDONLY|os.O_BINARY)
+        tfd = os.open(tfn, os.O_RDONLY|bin)
         buf = os.read(tfd, 8192)
         logging.info("test00CropFail(): buf size is %d" % len(buf))
         os.close(tfd)
         ifn = "12-00-01-12345.jpg"
         ifp = os.path.join(indir, ifn)
-        infd = os.open(ifp, os.O_WRONLY|os.O_BINARY|os.O_CREAT)
+        infd = os.open(ifp, os.O_WRONLY|bin|os.O_CREAT)
         os.write(infd, buf)
         os.fsync(infd)
         os.close(infd)
@@ -384,29 +398,41 @@ class TestSurveilleance(unittest.TestCase):
         if threading.currentThread().name == "MainThread":
             self.waitForThreads()   # wait for communityview to complete current tasks
             # if we've had a pass through communityview's main loop without
-            # finding any work to do, set the terminate flag and return
+            # finding any work to do, set the main loop terminate flag and the
+            # stats loop terminate flag, then release the stats thread, and wait
+            # for it to finish
             if moduleUnderTest.images_to_process == False \
                     and moduleUnderTest.files_to_purge == False:
                 moduleUnderTest.terminate_main_loop = True
+                stats.terminate_stats_loop = True
+                self.stats_run.set()    # release the blocked stats thread
+                assert self.stats_thread, "Don't have stats thread to wait on."
+                self.stats_thread.join()     
+        # if this is the stats thread calling sleep(), block until the main loop
+        # is done with its processing, then let stats thread run to write the
+        # stats file(s)
+        elif is_thread_prefix(threading.current_thread(), "Stats"):
+            self.stats_thread = threading.current_thread()
+            self.stats_run.wait()
         else:
             # the only other sleep call is in processtoday().
             # If processtoday() is trying to sleep, it thinks it's done with
-            # its work, so force it to return so that its thread will die
+            # its work, so force it to return so that its thread will die.
             moduleUnderTest.terminate_processtoday_loop = True
 
     def waitForThreads(self):
+        """Wait for all threads to die that are not either threads
+        that were running when the test was started, or the stats thread."""
         wait = True
         while wait:
             wait = False
             for thread in threading.enumerate():
-                if self.origThreadList.count(thread) == 0:
+                if self.origThreadList.count(thread) == 0 \
+                        and not is_thread_prefix(thread, "Stats"):
                     logging.info("waitForThreads: waiting for "+thread.name)
                     wait = True
                     thread.join()
         logging.info("waitForThreads: done waiting for all threads")
-                        
-
-
 
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']

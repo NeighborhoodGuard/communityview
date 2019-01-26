@@ -1,0 +1,37 @@
+
+
+To install, extract the tarball into a path accessible via your webserver, for instance
+
+  /var/www/htpasstool
+
+Make sure the directory is owned by the user your webserver runs as (e.g. www-data).
+
+-----------------------------------------------------------------------------
+
+First of all, edit the index.php file as follows.
+
+1 Change the BASE_DIRECTORY constant to your liking. The htpasstool script
+operates below this directory; in other words; if you put BASE_DIRECTORY to
+/var/www/somewhere, htpasstool will only be able to manage .htaccess and
+.htpasswd files in /var/www/somewhere/... It will not be able to manage
+/var/www, or even /var/www/somewhereelse/.
+
+2. If you changed BASE_DIRECTORY, you are probably going to want to modify the
+$url_prefix variable too. See inside the index.php file for an explanation of
+what this variable does.
+
+3. If you intend to use the password reset/assign e-mail functionality, also
+set/modify $admin_email, $template_subject and $template_body to your liking.
+
+-----------------------------------------------------------------------------
+
+Now surf to the htpasstool directory on your webserver.
+
+If you don't have .htpasswd/.htaccess files yet in that directory, start by
+adding a user, and then protect the directory.
+
+At this point, you are set up. You can use htpasstool to manage .htpasswd files
+across your webspace.
+
+Ward Vandewege, 2006-12-03
+ward@pong.be

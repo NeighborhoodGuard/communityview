@@ -1,15 +1,43 @@
 # Release Notes for CommunityView #
 
+## v1.0.0 - 2019/01/23
+_Doug Kerr_
+
+### Major Changes
+
+- Add installation script to install and configure CommunityView, along with
+all other required software, on a dedicated server.
+- Fix threading bug between previous day and today threads that sometimes
+caused both threads to try to process the same images files, resulting
+in "No such file" errors.
+- Add performance graphs.
+- Add built-in mechanism to manage user names and passwords
+for Basic Authentication.
+
+### Minor Changes
+
+- Fix unit test code so that it works on both Linux and Windows.
+- Improve logging of failure when cropping images.
+- Update installation documentation for new installation procedure and
+installation on AWS.
+
+### To Do
+
+* Move sequence-page navigation to top of page.
+* Add UI link to source code.
+* Add graceful shutdown.
+* Update communityview.py to use config file
+
+### Known Issues
+
+* The `Next day` links in day pages are sometimes incorrectly grayed out.
+
 ## v0.9.4 - 2014/03/24 ##
 _Doug Kerr_
 
 ### Changes
 
 * Change name to CommunityView.
-
-### Known Issues
-
-* The `Next day` links in day pages are sometimes incorrectly grayed out.
 
 ### To Do
 

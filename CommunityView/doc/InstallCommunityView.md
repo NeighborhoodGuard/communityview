@@ -1,6 +1,14 @@
-## Installing Neighborhood Guard's CommunityView Software ##
+## Installing CommunityView on a Shared-Hosting Server ##
 
-_Note: These instructions are tailored to using DreamHost as the hosting service, as this has been our platform of choice to date. Sites hosted by other services will vary in the details, particularly in the areas of creating a domain for the Web server, setting up Basic Authentication, python functionality and crontab entries._
+### Introduction
+
+This document describes the steps to install Neighborhood Guard's CommunityView
+software on a shared-hosting server.  It assumes
+you do not have root access to the server.  These instructions are tailored to using DreamHost as the hosting service, as this has been our platform of choice to date. Sites hosted by other services will vary in the details, particularly in the areas of creating a domain for the Web server, setting up Basic Authentication, python functionality and crontab entries.
+
+If you are installing CommunityView on a dedicated server (physical or virtual),
+please see 
+[Installing CommunityView on a Dedicated Server](InstallCVDedicated.md).
 
 ### Prerequisites 
 

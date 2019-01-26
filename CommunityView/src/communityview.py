@@ -1,7 +1,7 @@
 ################################################################################
 #
-# Copyright (C) 2012-2014 Neighborhood Guard, Inc.  All rights reserved.
-# Original author: Jesper Jercenoks
+# Copyright (C) 2012-2018 Neighborhood Guard, Inc.  All rights reserved.
+# Original author: Jesper Jurcenoks
 # 
 # This file is part of CommunityView.
 # 
@@ -26,7 +26,7 @@
 #                                                                              #
 ################################################################################
 
-version_string = "0.9.4"
+version_string = "1.0.0"
 
 
 import os
@@ -40,7 +40,8 @@ import re
 import threading
 import time
 import logging.handlers
-
+import stats
+from utils import dir2date, file2time, get_images_in_dir, get_daydirs
 from localsettings import * #@UnusedWildImport (Camera)
 
     
@@ -56,7 +57,7 @@ delete=True
 thumbsize =(128,128)
 mediumsize = (800,600)
 title = "Neighborhood Guard CommunityView"
-footer = "Software Copyright (c) 2012-2014  Neighborhood Guard, Inc. All rights reserved."
+footer = "Software Copyright (c) 2012-2018  Neighborhood Guard, Inc. All rights reserved."
 
 
 
@@ -151,8 +152,10 @@ def crop_image(img, croparea):
     try:
         cropped_image = img.crop((topleft_x, topleft_y, lowerright_x, lowerright_y))
     except IOError:
-        logging.error("crop_image: Can't crop. Img size: (%d, %d); crop area topleft: (%d, %d), lowerright (%d, %d)" \
-                      % (size_x, size_y, topleft_x, topleft_y, lowerright_x, lowerright_y))
+        logging.debug("crop_image: Can't crop. Img size: (%d, %d); crop area" \
+                       "topleft: (%d, %d), lowerright (%d, %d)" \
+                      % (size_x, size_y, topleft_x, topleft_y, 
+                         lowerright_x, lowerright_y))
         cropped_image = None
 
     return cropped_image
@@ -186,16 +189,17 @@ def processImage(indir, filename, cam, master_image=None):
                 del img     # close img
 
             if cropped_img == None:
-                logging.error("Failed to crop image %s, croparea: %s" % (infilepathfilename, str(cam.croparea)))
                 # crop failure is likely due to attempting to process the
                 # incoming image while it is still being uploaded. Return from
                 # processImage() here and leave image in incoming dir--don't
-                # mark it "done" by moving it to the hires dir. When we get
+                # mark it "done" by moving it to the hires dir. 
+                # Just log this as a warning, not an error.  When we get
                 # around to processing this image again, it will probably work
                 # correctly.  However, if the image mod time is more than an
                 # hour old, it's not likely to still be uploading, so assume
                 # it's just broken and let the normal code move it to hires
                 # so we don't try to process it again
+                logging.warn("Failed to crop image %s, croparea: %s" % (infilepathfilename, str(cam.croparea)))
                 if os.path.getmtime(infilepathfilename) >= (time.time() - 3600):
                     logging.info("Returning from processImage()" \
                                  + ", leaving original image in place")
@@ -226,10 +230,18 @@ def processImage(indir, filename, cam, master_image=None):
                     logging.error("Cannot save thumbnail %s" % thumbpathfilename)
     
       
-        # done processing, move raw file to storage, so we won't process it again.
+        # done processing, capture the stats, move raw file to storage so we
+        # won't process it again.
+        #
         infilepathfilename = inpath(indir, filename)
         hirespathfilename = hirespath(indir, filename)
+        stats.proc_stats(infilepathfilename)
         
+        # if this is a file we can't crop, we're now giving up on ever being
+        # able to crop it by moving it to hires.  Log as an error
+        if cropped_img == None:
+            logging.error("Failed to crop image; moving to hires: %s" % infilepathfilename);
+            
         shutil.move(infilepathfilename,hirespathfilename)
     except Exception, e:
         logging.error("Unexpected exception in processImage()")
@@ -500,42 +512,6 @@ def process_sequence(indir, sequences, cam, sequence_index):
     return
 
 
-def dir2date(indir):
-    #extract date from indir style z:\\ftp\\12-01-2
-    searchresult = re.search(r".*/([0-9]{4})-([0-9]{2})-([0-9]{2})", indir)
-    if searchresult == None:     #extract date from indir style 12-01-2
-        searchresult = re.search(r".*([0-9]{4})-([0-9]{2})-([0-9]{2})", indir)
-        
-    if searchresult != None:
-        year= int(searchresult.group(1))
-        month = int(searchresult.group(2))
-        day = int(searchresult.group(3))
-    else:
-        year = None
-        month = None
-        day = None
-
-    return (year, month, day)
-
-
-
-def file2time(filename):
-    #extract time from filename style  0-42-3023210.jpg
-
-    searchresult = re.search(r"([0-9]{1,2})-([0-9]{2})-([0-9]{2})", filename)
-
-    if searchresult != None:
-        hour = int(searchresult.group(1))
-        minute = int(searchresult.group(2))
-        second = int(searchresult.group(3))
-    else:
-        hour = None
-        minute = None
-        second = None
-
-    return (hour, minute, second)
-
-
 def make_subdirs(indir):
     mkdir(os.path.join(indir, thumbdir))
     mkdir(os.path.join(indir, mediumresdir))
@@ -576,23 +552,6 @@ def sequence_dirlist(files, indir, last_processed_image):
     if sequences[0] == []:
         sequences = sequences[1:]
     return (sequences, last_processed_sequence)
-
-
-def get_images_in_dir(indir):
-
-    images = []
-
-    if os.path.isdir(indir):
-        logging.info("loading dirlist for %s" % indir)
-        origfiles = os.listdir(indir)
-
-        for origfile in origfiles:
-            if origfile.lower().endswith(".jpg"):
-                images.append(origfile)
-
-        logging.info("sorting dirlist for %s" % indir)
-        images=sorted(images)
-    return images
 
 
 def make_sequence_and_last_processed_image(indir):
@@ -687,19 +646,6 @@ def deltree(deldir):
     return
 
 
-def get_daydirs():        
-    daydirlist = os.listdir(root)
-
-    daydirs=[]
-    for direc in daydirlist:
-        (year, unused_month, unused_day) = dir2date(direc)
-        dirpath = os.path.join(root, direc)
-        if os.path.isdir(dirpath) and year != None:
-            daydirs.append(dirpath)
-    daydirs = sorted(daydirs)
-
-    return daydirs
-
 def purge_images(daydirs):
     logging.info("Starting purge_images()")
     try:
@@ -718,6 +664,12 @@ def isdir_today(indir):
 
     return (processingyear==current.year and processingmonth == current.month and processingday==current.day)
 
+# keep track of what daydir processtoday() is working on in this var.
+# Set before processtoday_thread starts and cleared after it terminates.
+# We do this so that process_previous_days() can insure that it does not
+# start to work on a daydir that processtoday() is still working on
+#
+processtoday_daydir = ""
 
 def process_previous_days(daydirs):
     logging.info("Starting process_previous_days()")
@@ -725,6 +677,10 @@ def process_previous_days(daydirs):
         if len(daydirs) > 0:
             start = 1 if isdir_today(daydirs[0]) else 0
             for day_index in range(start, len(daydirs)):
+                if daydirs[day_index]==processtoday_daydir:
+                    logging.info("process_previous_days() skipping "
+                                 + processtoday_daydir)
+                    continue
                 process_day(daydirs, day_index)
     except Exception, e:
         logging.error("Unexpected exception in process_previous_days()")
@@ -840,9 +796,11 @@ def main():
     
     global images_to_process
     global files_to_purge
+    global processtoday_daydir
     
     set_up_logging()
     logging.info("Program Started, version %s", version_string)
+    stats.restart_stats()
 
     try:
         # Setup the threads, don't actually run them yet.
@@ -850,6 +808,7 @@ def main():
         processtoday_thread = threading.Thread(target=processtoday, args=())
     
         purge_thread = threading.Thread(target=purge_images, args=())
+        stats_thread = None
     
         while True:
             images_to_process = False   # only for testing purposes
@@ -858,11 +817,20 @@ def main():
     
             files_to_purge = len(daydirs) > retain_days
             
+            if not (stats_thread and stats_thread.is_alive()):
+                stats_thread = threading.Thread(target=stats.stats_loop, \
+                                                args=(cameras,))
+                stats_thread.start()
+            
             if len(daydirs) > retain_days:
                 if not purge_thread.is_alive():
                     purge_thread = threading.Thread(target=purge_images, args=(daydirs[:-retain_days],))
                     purge_thread.start()
-    
+
+                # since we have images to purge, we probably need to purge
+                # stats files, too
+                stats.expire_stats(retain_days)
+
                 daydirs = daydirs[-retain_days:] # only move forward with the daydirs that are not about to be deleted.
     
             # reverse sort the days so that most recent day is first
@@ -870,11 +838,15 @@ def main():
     
             make_day_list_html(daydirs)
                     
+            # track which daydir processtoday() is working on
+            if not processtoday_thread.is_alive():
+                processtoday_daydir = ""
+            
             # Today runs in 1 thread, all previous days are handled in 1 thread 
             # starting with most recent day and working backwards.
-                
             if len(daydirs) > 0 and isdir_today(daydirs[0]):
                 if not processtoday_thread.is_alive():
+                    processtoday_daydir = daydirs[0] # track which day we're on
                     processtoday_thread = threading.Thread(target=processtoday, args=(daydirs,))
                     processtoday_thread.start()
     

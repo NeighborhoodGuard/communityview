@@ -1,0 +1,339 @@
+<!--
+################################################################################
+#
+# Copyright (C) 2018 Neighborhood Guard, Inc.  All rights reserved.
+# Original author: Douglas Kerr
+#
+# This file is part of CommunityView.
+#
+# CommunityView is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# CommunityView is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with CommunityView.  If not, see <http://www.gnu.org/licenses/>.
+#
+################################################################################
+-->
+<html>
+<head>
+<script type="text/javascript">
+dygraphs = [];
+gnames = [];
+dataColors = ["green", "cyan", "blue", "purple", "magenta", "red", "orange"];
+syncZoom = true;    // driven by Sync Zoom checkbox
+blockCallback = false;
+ranges = [];
+// indicates that we are in the process of syncing the rolling avg value
+// across all graphs
+isSyncingRoll = false;
+// indicates that we are in the process of setting the visibility of data
+// series across all graphs
+isSettingVis = false;
+
+function dcgraph(dcdate, gindex) {
+    gname = gnames[gindex];
+    dygraphs[gindex] = new Dygraph(
+
+        // containing div
+        document.getElementById(gname+"_div"),
+
+        // CSV or path to a CSV file.
+        dcdate + "_" + (gname=="ServerTotals" ? "" : gname) + ".csv", {
+            title: dcdate + " -- " + gname,
+            xlabel: "Time",
+            ylabel: "Images/Min & Latency (Min)",
+            y2label: "Unprocessed Images",
+            rollPeriod: parseInt(document.getElementById("syncroll").value),
+            showRoller: true,
+            labelsSeparateLines: true,
+            labelsDiv: gname+"_l_div",
+            colors: dataColors,
+            series : {
+                "Today's Unprocessed Images":{
+                    axis: "y2"
+                },
+                "Previous Days' Unprocessed Images":{
+                    axis: "y2"
+                }
+            },
+            axes: {
+                y: {
+                    axisLabelWidth: 70
+                },
+                y2: {
+                    labelsKMB: true,
+                    drawGrid: true,
+                    gridLinePattern: [2,8],
+                    independentTicks: true,
+                    axisLabelWidth: 70
+                }
+            },
+            visibility: getVisSwitches().concat(gname=="ServerTotals" ?
+                [false, false] : []),
+
+            drawCallback: function(g, isInitial) {
+                //console.log("drawCallback of " + g);
+                if( isInitial ) {
+                    drawSwitches(g);
+                    handleSyncCb();
+                    ranges[g.getOption("title")]
+                        = [g.xAxisRange(), g.yAxisRange()];
+                }
+                else if (blockCallback || isSyncingRoll || isSettingVis) {
+                    //console.log("blocked callback: graph "+g+", xAxisRange: "
+                    //  +g.xAxisRange()+", yAxisRange: "+g.yAxisRange());
+                    ranges[g.getOption("title")]
+                        = [g.xAxisRange(), g.yAxisRange()];
+                }
+                // the intent of the preceding tests is that we should
+                // only get here if the callback is due to a zoom event
+                else if (syncZoom) {
+                    blockCallback = true;
+                    var ra = ranges[g.getOption("title")];
+                    var oldxrange = ra[0];
+                    var oldyrange = ra[1];
+                    var xrange = g.xAxisRange();
+                    var yrange = g.yAxisRange();
+                    var isZoomed = g.isZoomed();
+                    //console.log("Zoom event: graph: "+g);
+                    for (i=0; i<dygraphs.length; i++) {
+                        if (dygraphs[i] == g)
+                            continue;
+                        if (!isZoomed) {
+                            dygraphs[i].resetZoom();
+                        }
+                        else if (xrange[0] != oldxrange[0] 
+                              || xrange[1] != oldxrange[1]) {
+                            //console.log("graph "+i+": set x zoom " + xrange);
+                            dygraphs[i].updateOptions( {
+                                dateWindow: xrange
+                            } );
+                        }
+                        else if (yrange[0] != oldyrange[0] 
+                              || yrange[1] != oldyrange[1]) {
+                            //console.log("graph "+i+": set y zoom " + yrange);
+                            dygraphs[i].updateOptions( {
+                                valueRange: yrange
+                            } );
+                        }
+                        ra[0] = g.xAxisRange(); 
+                        ra[1] = g.yAxisRange();
+                    }
+                    blockCallback = false;
+                }
+            },
+        }
+
+    );
+}
+
+function drawSwitches(g) {
+    sdiv = document.getElementById("switches_div");
+    if ( sdiv.innerHTML.length == 0 ) { // if switches div empty
+        var l = g.getLabels();
+        if (l.length == 1) {
+            return; // leave the switches div empty if graph has no data file
+        }
+        var t = "";
+        for (i=1; i<l.length; i++) {
+            // checkboxes
+            cb = document.createElement("input");
+            cb.type = "checkbox";
+            cb.id = "" + (i-1); // graph data series number
+            cb.checked = true;
+            cb.setAttribute("onchange", "handleVisCb(this)");
+            sdiv.appendChild(cb);
+
+            // checkbox labels
+            cbl = document.createElement("label");
+            cbl.style = "color:" + dataColors[i-1];
+            cbl.htmlFor = "" + (i-1);
+            cbl.appendChild(document.createTextNode(l[i]));
+            sdiv.appendChild(cbl);
+
+            sdiv.appendChild(document.createElement("br"));
+        }
+    }
+}
+
+function handleSyncCb() {
+    cb = document.getElementById("synccb");
+    if( cb == null )
+        return; // ignore if cb not created (because switches div still empty)
+    syncZoom = cb.checked;
+}
+
+function toggleAll() {
+    var newstate = ! document.getElementById("0").checked;
+    for( var i=0; i<dataColors.length; i++ ) {
+        document.getElementById(""+i).checked = newstate;
+    }
+    setVisFromSwitches();
+}
+
+
+// return the state of the visibility switches as a boolean array
+function getVisSwitches() {
+    var vis = [];
+
+    // if the switches don't exist yet, set all visibilities to true
+    sdiv = document.getElementById("switches_div");
+    if (sdiv.innerHTML.length == 0) {
+        for( var i=0; i<dataColors.length; i++ ) {
+            vis[i] = true;
+        }
+    } else {
+        for( var i=0; i<dataColors.length; i++ ) {
+            vis[i] = document.getElementById(""+i).checked;
+        }
+    }
+    return vis;
+}
+
+function setVisFromSwitches() {
+    var vis = getVisSwitches();
+    isSettingVis = true;
+    for (var i=0; i<dygraphs.length; i++ ) {
+        for( var j=0; j<dataColors.length; j++) {
+            dygraphs[i].setVisibility( j, vis[j] );
+        }
+    }
+    isSettingVis = false;
+}
+
+
+// when a visibility checkbox is changed, this function is called to
+// set the corresponding data plot on each graph visible or hidden
+function handleVisCb(cb) {
+    var cbn = parseInt(cb.id);
+    isSettingVis = true;
+    for( var i=0; i<gnames.length; i++ ) {
+        dygraphs[i].setVisibility(cbn, cb.checked);
+    }
+    isSettingVis = false;
+}
+
+function handleDateButton(b) {
+    // our standard date format (yyyy-mm-dd) is the ISO format and
+    // is interpreted by the Date constructor as UTC,
+    // whereas mm/dd/yyyy is interpreted as the local timezone :-P
+    var d = document.getElementById("date");
+    newdate = new Date(d.value.slice(5,7)+"/"+d.value.slice(8,10)
+                        +"/"+d.value.slice(0,4));
+
+    newdate.setDate(newdate.getDate() + (b.id=="next" ? 1 : -1));
+    d.value = formatDate(newdate);
+    drawgraphs(d.value);
+}
+
+function setUpDivs() {
+    var tab = document.createElement("table");
+    for (i=0; i<gnames.length; i++ ) {
+        var row = tab.insertRow(i);
+
+        // graph area
+        var re = row.insertCell(0);
+        var div = document.createElement("div");
+        div.id = gnames[i]+"_div";
+        div.style.width = "700px";
+        div.style.height = "200px";
+        //document.body.appendChild(div);
+        re.appendChild(div);
+
+        // legend area
+        re = row.insertCell(1);
+        div = document.createElement("div");
+        div.id = gnames[i]+"_l_div";
+        div.style.width = "300px";
+        div.style.height = "200px";
+        re.appendChild(div);
+        
+    }
+    document.body.appendChild(tab);
+}
+
+function drawgraphs(date) {
+    dygraphs = [];
+    for (i=0; i<gnames.length; i++ ) {
+        window.dcgraph(date, i);
+    }
+}
+
+function react(e, value) {
+    if(e.keyCode==13) {
+        drawgraphs(value)
+    }
+}
+
+function reactSyncRoll(e, value) {
+    if(e.keyCode==13) {
+        isSyncingRoll = true;
+        for (i=0; i<dygraphs.length; i++ ) {
+            dygraphs[i].adjustRoll(parseInt(value));
+        }
+        isSyncingRoll = false;
+    }
+}
+
+function formatDate(date) {
+    var yyyy = date.getFullYear();
+    var mm = date.getMonth()+1;
+    var dd = date.getDate();
+    var fmtDate = yyyy + "-" + twodigits(mm) + "-" + twodigits(dd);
+    return fmtDate;
+}
+
+function twodigits(num) {
+    var s = num + "";
+    if (s.length < 2)
+            s = "0" + s;
+    return s;
+}
+
+function drawfirsttime() {
+    gnames = cameras.slice();
+    gnames.push("ServerTotals");
+    setUpDivs();
+
+    var datestr = formatDate(new Date());
+    var d = document.getElementById("date");
+    d.value = datestr;
+    drawgraphs( datestr );
+}
+
+</script>
+</head>
+<body onload="drawfirsttime()">
+Date:
+<input id="date" type="text" size="8" onKeydown="react(event, this.value)">
+<input id="prev" type="button" value="<" onclick="handleDateButton(this)"/>
+<input id="next" type="button" value=">" onclick="handleDateButton(this)"/>
+
+<!-- make sure there are zero chars in the initial switches_div -->
+<div id="switches_div"></div>
+
+<!-- button to toggle all switches -->
+<input type="button" value="All" onclick="toggleAll()">
+
+<!-- Sync Zoom checkbox -->
+<input type="checkbox" id="synccb" checked="true" onchange="handleSyncCb()"
+   style="margin-left:35px">
+<label for="synccb">Sync Zoom</label>
+
+<!-- Sync Rolling Avg textbox -->
+<label for="syncroll" style="margin-left:35px">Sync Rolling Avg</label>
+<input type="text" id="syncroll" size="2" value="10"
+    onkeydown="reactSyncRoll(event,this.value)">
+
+<script type="text/javascript" src="dygraph.js"></script>
+<script type="text/javascript" src="cameras.js"></script>
+<link rel="stylesheet" href="dygraph.css" />
+</body>
+</html>

@@ -1,6 +1,6 @@
 ################################################################################
 #
-# Copyright (C) 2014 Neighborhood Guard, Inc.  All rights reserved.
+# Copyright (C) 2014-2018 Neighborhood Guard, Inc.  All rights reserved.
 # Original author: Douglas Kerr
 # 
 # This file is part of CommunityView.
@@ -56,5 +56,5 @@ cameras = [
 #                                                                                #
 ##################################################################################
         
-root = "c:/survtesting"
+root = "/tmp/survtesting"
 
