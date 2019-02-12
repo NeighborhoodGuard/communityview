@@ -398,7 +398,8 @@ configure() {
     mk_dir $perf_dir
     chown $up_user:$up_user $perf_dir
     cp $our_dir/../src/stats.html $perf_dir/index.html
-    cp $our_dir/../dygraphs/dygraph-combined.js $perf_dir
+    cp $our_dir/../dygraphs/dygraph.js $perf_dir
+    cp $our_dir/../dygraphs/dygraph.css $perf_dir
 
     # edit the code to set config values :-P
     #
