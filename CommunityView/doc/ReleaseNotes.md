@@ -1,5 +1,23 @@
 # Release Notes for CommunityView #
 
+## v1.0.1 - 2019/02/12
+_Doug Kerr_
+
+### Changes
+
+- Fix incorrect/missing Dygraphs files
+
+### To Do
+
+* Move sequence-page navigation to top of page.
+* Add UI link to source code.
+* Add graceful shutdown.
+* Update communityview.py to use config file
+
+### Known Issues
+
+* The `Next day` links in day pages are sometimes incorrectly grayed out.
+
 ## v1.0.0 - 2019/01/23
 _Doug Kerr_
 
