@@ -28,7 +28,7 @@
 # CommunityView software.
 
 # version of the confcvserver software
-version="1.0.1"
+version="1.0.2"
 
 . ./utils.sh
 #. ./confui.sh

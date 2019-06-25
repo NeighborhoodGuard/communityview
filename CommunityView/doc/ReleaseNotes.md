@@ -1,14 +1,16 @@
 # Release Notes for CommunityView #
 
-## v1.0.1 - 2019/02/12
+## v1.0.2 - 2019/06/25
 _Doug Kerr_
 
 ### Changes
 
-- Fix incorrect/missing Dygraphs files
+- Fix crash in stats code when trying to remove temp file after non-graceful
+shutdown
 
 ### To Do
 
+* Make CommunityView remove oldest images if disk space nearly full
 * Move sequence-page navigation to top of page.
 * Add UI link to source code.
 * Add graceful shutdown.
@@ -17,6 +19,13 @@ _Doug Kerr_
 ### Known Issues
 
 * The `Next day` links in day pages are sometimes incorrectly grayed out.
+
+## v1.0.1 - 2019/02/12
+_Doug Kerr_
+
+### Changes
+
+- Fix incorrect/missing Dygraphs files
 
 ## v1.0.0 - 2019/01/23
 _Doug Kerr_
