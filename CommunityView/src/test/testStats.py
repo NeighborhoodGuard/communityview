@@ -240,7 +240,7 @@ class TestStats(unittest.TestCase):
     def test030expire_stats(self):
         """Test to see that expire_stats deletes the correct files."""
         to_be_deleted = [
-            "2000-01-01_cam1.csv",
+            "2000-01-01_cam1.csv.temp",
             "2000-01-01_cam2.csv",
             "2000-01-02_cam1.csv",
             "2000-01-02_cam2.csv",
@@ -248,7 +248,7 @@ class TestStats(unittest.TestCase):
             "2000-01-02_.csv",
             ]
         to_be_retained = [
-            "2000-01-03_cam1.csv",
+            "2000-01-03_cam1.csv.temp",
             "2000-01-03_cam2.csv",
             "2000-01-04_cam1.csv",
             "2000-01-04_cam2.csv",

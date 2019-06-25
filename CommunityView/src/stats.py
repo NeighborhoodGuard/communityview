@@ -355,7 +355,8 @@ def expire_stats(retain_days):
     """Retain the number of days of stats files specified by retain_days,
     if extant, and remove any stats files from earlier days."""
     files = os.listdir(statspath)
-    mobjs = [re.search(r"^(\d\d\d\d-\d\d-\d\d)_.*\.csv",f) for f in files]
+    # find stats files; the .* at the end of the re picks up stats .temp files
+    mobjs = [re.search(r"^(\d\d\d\d-\d\d-\d\d)_.*\.csv.*",f) for f in files]
     statsdates = sorted(list(set([m.group(1) for m in mobjs if m])))
     # if there are more stats file dates than the number we're supposed to
     # retain, delete the out-of-date files
