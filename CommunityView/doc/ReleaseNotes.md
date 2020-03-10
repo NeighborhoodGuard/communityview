@@ -1,12 +1,11 @@
 # Release Notes for CommunityView #
 
-## v1.0.2 - 2019/06/25
+## v1.1.0 - 2020/03/09
 _Doug Kerr_
 
 ### Changes
 
-- Fix crash in stats code when trying to remove temp file after non-graceful
-shutdown
+- Implement _kswapd0hack_ service.  This service defends against the problem of the _kswapd0_ process eventually taking all of the CPU when the system is under heavy load.  It reboots the machine when _kswapd0_ CPU consumption rises to 10%.  Web search for "kswapd0 taking a lot of cpu" to see many write-ups on this problem.
 
 ### To Do
 
@@ -19,6 +18,14 @@ shutdown
 ### Known Issues
 
 * The `Next day` links in day pages are sometimes incorrectly grayed out.
+
+## v1.0.2 - 2019/06/25
+_Doug Kerr_
+
+### Changes
+
+- Fix crash in stats code when trying to remove temp file after non-graceful
+shutdown
 
 ## v1.0.1 - 2019/02/12
 _Doug Kerr_

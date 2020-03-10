@@ -28,7 +28,7 @@
 # CommunityView software.
 
 # version of the confcvserver software
-version="1.0.2"
+version="1.1.0"
 
 . ./utils.sh
 #. ./confui.sh
@@ -52,6 +52,7 @@ config_dir=/etc/opt/communityview # XXX future use
 var_dir=/var/opt/communityview
 log_dir=$var_dir/log
 systemd_dir=/lib/systemd/system
+kswapd0hack_code_dir=/opt/communityview
 
 # log file for this script
 scriptlog=confcvserver.log
@@ -229,7 +230,7 @@ configure() {
     # and remove the service file if it's there
     systemctl stop communityview || true
     systemctl disable communityview || true
-    tgt=$systemd_dir/communityview.service
+    local tgt=$systemd_dir/communityview.service
     rm -f "$tgt"
 
     task="creating the upload user account"
@@ -454,6 +455,24 @@ configure() {
     cp $name.sh $code_dir/$name
     chmod 755 $code_dir/$name
     editcrontab $name "7 8,14,20 * * * $code_dir/$name"
+
+    task="installing hack to defend against kswapd0 bug"
+    echo "***** $task" | tee /dev/tty
+    local name=kswapd0hack
+    systemctl stop $name.service || true
+    systemctl disable $name.service || true
+    tgt=$systemd_dir/$name.service
+    rm -f "$tgt"
+    cp $our_dir/../$name/$name.service "$tgt"
+    chmod 644 "$tgt"
+    chown root:root "$tgt"
+    tgt="$kswapd0hack_code_dir"/$name
+    mk_dir "$kswapd0hack_code_dir"
+    cp $our_dir/../$name/$name.sh "$tgt"
+    chmod 755 "$tgt"
+    chown root:root "$tgt"
+    systemctl enable $name.service
+    systemctl start $name.service
 
     # accounts-daemon seems to have a bug wherein it frequently goes crazy
     # and sucks up all the CPU
