@@ -1,5 +1,30 @@
 # Release Notes for CommunityView #
 
+## v1.2.0 - 2023/07/25
+_Doug Kerr_
+
+### Changes
+
+- CommunityView now runs on Ubuntu 16.04, 18.04 and 20.04.
+- Improve FTP masquerade.  Should automatically select proper masquerade
+address for passive FTP on any system.  Formerly only worked correctly on AWS.
+- Document FTP masquerade configuration and required firewall settings in
+dedicated-installation document.
+- Reduce passive-FTP port range to 60000-60099.
+- Fix incompatibilities with Ubuntu 18.04 and 20.04.
+
+### To Do
+
+* Update CommunityView to run on Ubuntu 22.04.
+* Make CommunityView remove oldest images if disk space nearly full.
+* Move sequence-page navigation to top of page.
+* Add UI link to source code.
+* Add graceful shutdown.
+
+### Known Issues
+
+* The `Next day` links in day pages are sometimes incorrectly grayed out.
+
 ## v1.1.0 - 2020/03/09
 _Doug Kerr_
 
@@ -13,7 +38,6 @@ _Doug Kerr_
 * Move sequence-page navigation to top of page.
 * Add UI link to source code.
 * Add graceful shutdown.
-* Update communityview.py to use config file
 
 ### Known Issues
 

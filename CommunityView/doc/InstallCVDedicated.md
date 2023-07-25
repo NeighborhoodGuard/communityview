@@ -4,10 +4,18 @@
 
 This document describes the steps to install Neighborhood Guard's CommunityView
 software on a dedicated server, either physical or virtual.  It assumes
-you have root access to the server.  This process was developed for Ubuntu
-16.04 LTS and has been tested on dedicated, virtual x86 machines and on Amazon
+you have root access to the server.
+
+This process was developed on Ubuntu
+16.04 LTS and has been tested and run extensively
+on dedicated, virtual and physical x86 machines and on Amazon
 Web Services (AWS) EC2 virtual machines loaded with Amazon's 
 Ubuntu Server 16.04 LTS AMD64 20180814 AMI (ami-51537029).
+It has also been tested on Ubuntu 18.04 LTS and 20.04 LTS.
+
+CommunityView does not yet run on Ubuntu 22.04 LTS.  Ubuntu 22.04
+switches to Python 3 as the standard Python and there are multiple
+compatibility issues with CommunityView to be resolved.
 
 If you are installing on a shared-hosting server, please see
 [Installing CommunityView on a Shared-Hosting Server](InstallCommunityView.md).
@@ -15,21 +23,23 @@ If you are installing on a shared-hosting server, please see
 ### Overview
 
 Broadly speaking, the installation process consists of the following steps:
-1. Install Ubuntu Server 16.04 LTS on your (virtual or physical) machine.
+1. Install Ubuntu Server 16.04, 18.04 or 20.04
+on your (virtual or physical) machine.
 2. Configure the machine with appropriate disk storage.
-3. Download the CommunityView software.
-4. Create and edit the `cvserver.conf` file, which provides the configuration
+3. Configure the firewall.
+4. Download the CommunityView software.
+5. Create and edit the `cvserver.conf` file, which provides the configuration
 information for the installation.
-5. Run the `confcvserver.sh` script to install, configure and run all
+6. Run the `confcvserver.sh` script to install, configure and run all
 necessary software for a ComunityView server.
 
-### 1. Install Ubuntu Server 16.04 LTS
+### 1. Install Ubuntu Server 16.04, 18.04 or 20.04
 
 There are many tutorials and guides to installing the Ubuntu server software
-on the Web.  Search for "install ubuntu server 16.04" using your favorite
-search engine to find them.  The official Ubuntu tutorial is here: [https://tutorials.ubuntu.com/tutorial/tutorial-install-ubuntu-server-1604](https://tutorials.ubuntu.com/tutorial/tutorial-install-ubuntu-server-1604).
+on the Web.  Search for "install ubuntu server" using your favorite
+search engine to find them.
 
-After installing a fresh Ubuntu Server 16.04 (or any Linux system), 
+After installing a Ubuntu Server 16.04, 18.04 or 20.04,
 it's a good idea
 to bring the system up to date with the latest system software.
 To do this, log into the server and execute the following two commands:
@@ -82,7 +92,24 @@ A simple way to make this change permanent is to edit
 `/etc/rc.local`, and add the command to the end of the file.
 This will cause the command to be executed each time the system is rebooted.
 
-### 3. Download the CommunityView Software
+### 3. Configure the Firewall
+
+The exact steps to configure the firewall protecting the CommunityView server
+depend on the hosting environment in which the server is running, e.g., AWS,
+DreamHost, etc.  Please consult the documentation for your hosting environment
+for the steps involved.
+
+The following ports must be open for their respective protocols in order
+for the CommunityView server to operate.
+
+| Port       | Protocol | Description |
+| ----------:|:--------:| ----------- |
+|          21|TCP       | FTP control connection |
+|          22|TCP       | Secure Shell (SSH) |
+|          80|TCP       | CommunityView website (Apache)
+| 60000-60099|TCP       | FTP data connection range|
+
+### 4. Download the CommunityView Software
 
 Log into the server and 
 use the following command to download a ZIP archive of the CommunityView
@@ -101,7 +128,7 @@ Then, extract the files in the downloaded ZIP archive with this command:
 This will create the `communityview-master` directory in the current
 directory which contains the installation files.
 
-### 4. Create and Edit the `cvserver.conf` File
+### 5. Create and Edit the `cvserver.conf` File
 
 Change to the directory that will contain the `cvserver.conf` file:
 
@@ -156,6 +183,30 @@ CommunityView server.  If the FTP user name is "ng_user" and the password is
     up_user=ng_user
     up_pass=secretcode
 
+#### FTP Masquerade Address
+
+Image files are uploaded by `ftp_upload`
+using passive FTP, which means the client establishes the
+file transfer data connection, rather than the server as in active FTP.  In
+passive FTP, the server sends the IP address the client must connect to for
+file transfer on the control connection.  If the server is behind a NAT
+firewall, the server must know its external (outside the firewall) address so
+it can send the correct IP address.  This external address is the
+"masquerade" address.
+
+If the value "localif" is specified instead of an IP address, the server will
+use the IP address of the local interface that the FTP request is received
+on. Examples:
+
+    masquerade=1.2.3.4
+    masquerade=localif
+
+If no masquerade value is specified, the installation script attempts to
+determine the external IP address of the server and specifies that as the
+masquerade address to the FTP server.  It is usually a good choice to
+not specify a masquerade value and let the installation software determine
+this for the FTP server.
+
 #### Number of Days of Images to Retain on the CommunityView
 
 As noted above, `retain_days` sets the number of days of 
@@ -206,7 +257,7 @@ navigation page, but otherwise does not matter.
 When you have finished editing the cvserver.conf file, write it out to the 
 `confcvserver` directory.
 
-### Run the `confcvserver.sh` Script
+### 6. Run the `confcvserver.sh` Script
 
 Once you have edited the `cvserver.conf` file to reflect your setup,
 run the `confcvserver.sh` script as root by issuing the following command:
@@ -217,17 +268,15 @@ This will install and configure all the software required
 to implement your CommunityView server.
 
 At the end of the installation process, the script will create a private key
-for the upload user account (the account
-named in the `up_user` configuration line above), 
-if one does not already exist.
-The installation script will place the key file in the current directory
-and print an informational message to that effect.
-If your upload machine authenticates itself to the CommunityView server
-via Public Key authentication, use this key as the upload machine's
-private key.  If not, you can ignore this message.
+for the upload user account (the account named in the `up_user` configuration
+line above), if one does not already exist.  The installation script will place
+the key file in the current directory and print an informational message to
+that effect.  This key is needed by the `cktunnel` and `starttunnel` scripts
+that are part of the remote access mechanism included in the `FTP_Upload`
+software.  It can also be used for ssh login access to the `up_user` account.
 
-After running the script, if you find you need to change any of the 
-configuration items, simply edit the configuration file and run the script
+After running the installation script, if you find you need to change any of
+the configuration items, simply edit the configuration file and run the script
 again.
 
 If the script encounters errors, examine the error messages, edit the
