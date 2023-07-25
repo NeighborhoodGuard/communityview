@@ -63,6 +63,7 @@ test_editnpconf_name_value_editing() {
     editnpconf $tcf ExistingDirectiveWithSpecialChars '~/foo bar'
 
     # excpected conf file after editing
+    local o=""
     o=${o}'# Test conf file\n'
     o=${o}'# DefaultRoot <- this should not get edited\n'
     o=${o}'# next line is indented and contains multiple spaces\n'
@@ -75,6 +76,48 @@ test_editnpconf_name_value_editing() {
     o=${o}'RequireValidShell off\n'
     o=${o}'NewDirectiveWithSpecialChars ~/fooagain baragain\n'
     local tef=unit_test_temp_expctd_file
+    /bin/echo -ne "$o" > $tef
+
+    local diffs=`diff $tef $tcf`
+    local status=$?
+    if [ $status -ne 0 ]
+    then
+        fail "Output differs from expected:"
+        echo "$diffs"
+    else
+        rm $tef $tcf $tof
+    fi
+}
+
+test_editnpconf_name_removal() {
+    # initial conf file before editing
+    local i=""
+    i=${i}'# Test conf file\n'
+    i=${i}'# DefaultRoot <- this should not get edited\n'
+    i=${i}'# next line is indented and contains multiple spaces\n'
+    i=${i}'    PassivePorts    100    200\n'
+    i=${i}'\tNameSurroundedByTabs\t100    200\n'
+    i=${i}'ExistingDirectiveWithSpecialChars ~\n'
+    i=${i}'MasqueradeAddress blah\n'
+    i=${i}'# End of initial conf file\n'
+    local tcf=unit_test_temp_conf_file2
+    local tof=unit_test_temp_orig_file2
+    /bin/echo -ne "$i" > $tcf
+    /bin/echo -ne "$i" > $tof    # for debugging
+
+    editnpconf $tcf -r MasqueradeAddress
+    editnpconf $tcf -r NonextantName
+
+    # excpected conf file after editing
+    local o=""
+    o=${o}'# Test conf file\n'
+    o=${o}'# DefaultRoot <- this should not get edited\n'
+    o=${o}'# next line is indented and contains multiple spaces\n'
+    o=${o}'    PassivePorts    100    200\n'
+    o=${o}'\tNameSurroundedByTabs\t100    200\n'
+    o=${o}'ExistingDirectiveWithSpecialChars ~\n'
+    o=${o}'# End of initial conf file\n'
+    local tef=unit_test_temp_expctd_file2
     /bin/echo -ne "$o" > $tef
 
     local diffs=`diff $tef $tcf`
@@ -180,5 +223,191 @@ test_editcrontab_bad_args() {
         "editcrontab"
     _restore_crontab
 }
+
+test_is_ip_addr_form() {
+    local goodaddr="\
+        127.0.0.1 \
+        111.111.111.111 \
+        1.2.3.4 \
+        01.02.03.04 \
+        999.999.999.999 \
+        "
+    local badaddr="\
+        1.2.3 \
+        1.2.3.4.5 \
+        1.2..3 \
+        1.a.b.3 \
+        1 \
+        1/4 \
+        1/2/3/4 \
+        1.4 \
+        1.2a.3.4 \
+        "" \
+        1..2 \
+        a \
+        "
+
+    local addr
+    for addr in $goodaddr
+    do
+        assertTrue "is_ip_addr_form fails on good addr \"$addr\"" \
+            "is_ip_addr_form $addr"
+    done
+    for addr in $badaddr
+    do
+        assertFalse "is_ip_addr_form fails on bad addr \"$addr\"" \
+            "is_ip_addr_form $addr"
+    done
+}
+
+_proftpd_testconf() {
+    local i=""
+    i=${i}'# Test conf file\n'
+    i=${i}'# DefaultRoot <- this should not get edited\n'
+    i=${i}'# next line is indented and contains multiple spaces\n'
+    i=${i}'    PassivePorts    100    200\n'
+    i=${i}'\tNameSurroundedByTabs\t100    200\n'
+    i=${i}'ExistingDirectiveWithSpecialChars ~\n'
+    i=${i}'# End of initial conf file\n'
+    /bin/echo -ne "$i"
+}
+
+test_set_up_ftp_masquerade_nospec() {
+    local tcf=unit_test_temp_conf_file3
+    local tof=unit_test_temp_orig_file3
+    local tef=unit_test_temp_expctd_file3
+    local tcvcf=unit_test_temp_cvconf_file3
+
+    # initial conf file before editing
+    _proftpd_testconf > $tcf
+    cat $tcf > $tof    # for debugging
+
+    # empty cvserver.conf file
+    echo "" > $tcvcf
+
+    confile=$tcvcf
+    set_up_ftp_masquerade $tcf
+
+    # excpected conf file after editing
+    _proftpd_testconf > $tef
+    echo MasqueradeAddress `get_external_ip` >> $tef
+
+    local diffs=`diff $tef $tcf`
+    local status=$?
+    if [ $status -ne 0 ]
+    then
+        fail "Output differs from expected:"
+        echo "$diffs"
+    else
+        rm $tef $tcf $tof $tcvcf
+    fi
+}
+
+test_set_up_ftp_masquerade_localif() {
+    local tcf=unit_test_temp_conf_file4
+    local tof=unit_test_temp_orig_file4
+    local tef=unit_test_temp_expctd_file4
+    local tcvcf=unit_test_temp_cvconf_file4
+
+    # initial conf file before editing
+    _proftpd_testconf > $tcf
+    echo "MasqueradeAddress 1.1.1.1" >> $tcf
+    cat $tcf > $tof    # for debugging
+
+    # cvserver.conf file with masquerade value
+    echo "masquerade=localif" > $tcvcf
+
+    confile=$tcvcf
+    set_up_ftp_masquerade $tcf
+
+    # excpected conf file after editing
+    _proftpd_testconf > $tef
+
+    local diffs=`diff $tef $tcf`
+    local status=$?
+    if [ $status -ne 0 ]
+    then
+        fail "Output differs from expected:"
+        echo "$diffs"
+    else
+        rm $tef $tcf $tof $tcvcf
+    fi
+}
+
+test_set_up_ftp_masquerade_badip() {
+    local tcf=unit_test_temp_conf_file5
+    local tof=unit_test_temp_orig_file5
+    local tef=unit_test_temp_expctd_file5
+    local tcvcf=unit_test_temp_cvconf_file5
+
+    # initial conf file before editing
+    _proftpd_testconf > $tcf
+    cat $tcf > $tof    # for debugging
+
+    # cvserver.conf file with masquerade value
+    echo "masquerade=0.0.0.0.0" > $tcvcf
+
+    confile=$tcvcf
+    if set_up_ftp_masquerade $tcf > /dev/null
+    then
+        echo "set_up_ftp_masquerade returned success on bad IP address"
+        return 1
+    fi
+
+    # excpected conf file after editing
+    _proftpd_testconf > $tef
+
+    local diffs=`diff $tef $tcf`
+    local status=$?
+    if [ $status -ne 0 ]
+    then
+        fail "Output differs from expected:"
+        echo "$diffs"
+    else
+        rm $tef $tcf $tof $tcvcf
+    fi
+}
+
+test_set_up_ftp_masquerade_ipspec() {
+    local tcf=unit_test_temp_conf_file6
+    local tof=unit_test_temp_orig_file6
+    local tef=unit_test_temp_expctd_file6
+    local tcvcf=unit_test_temp_cvconf_file6
+
+    # initial conf file before editing
+    _proftpd_testconf > $tcf
+    cat $tcf > $tof    # for debugging
+
+    # cvserver.conf file with masquerade value
+    echo "masquerade=1.2.3.4" > $tcvcf
+
+    confile=$tcvcf
+    set_up_ftp_masquerade $tcf
+
+    # excpected conf file after editing
+    _proftpd_testconf > $tef
+    echo "MasqueradeAddress 1.2.3.4" >> $tef
+
+    local diffs=`diff $tef $tcf`
+    local status=$?
+    if [ $status -ne 0 ]
+    then
+        fail "Output differs from expected:"
+        echo "$diffs"
+    else
+        rm $tef $tcf $tof $tcvcf
+    fi
+}
+
+test_get_external_ip() {
+    local result
+    result=`get_external_ip`
+    local status=$?
+    assertTrue "get_external_ip returns failure status" "$status"
+    assertNotNull "get_external_ip outputs empty string" "$result"
+    local ip=`wget -q -O - https://api.ipify.org`
+    assertEquals "get_external_ip returns wrong addr" "$result" "$ip"
+}
+
 
 . `which shunit2`

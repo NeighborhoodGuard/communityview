@@ -83,3 +83,30 @@ create_dir() {
     done
 }
 
+# get our external (outside any firewall) IP address and print to
+# stdout.  If we can't get the address, return failure status
+#
+get_external_ip() {
+    if curl -s -m 4 \
+        http://169.254.169.254/latest/meta-data/public-ipv4 # AWS
+    then
+        : # no action
+    elif wget -q -O - https://api.ipify.org    # generic
+    then
+        : # no action
+    else
+        return 1
+    fi
+}
+
+# return true if the argument is in the form of an IPv4 address.
+# Only checks for proper form--does not check for improper numbers, e.g.,
+# 999.0.0.0.
+#
+# usage: is_ip_addr_form argument
+#
+is_ip_addr_form() {
+    echo "$1" | grep -E '^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$' \
+        > /dev/null
+}
+

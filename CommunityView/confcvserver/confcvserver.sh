@@ -28,7 +28,7 @@
 # CommunityView software.
 
 # version of the confcvserver software
-version="1.1.0"
+version="1.2.0"
 
 . ./utils.sh
 #. ./confui.sh
@@ -126,7 +126,7 @@ editsiteconf() {
     if grep -E '[[:space:]]*<Directory +/var/www/>' $1 > /dev/null
     then
     local ar
-    ar='/[[:space:]]*<Directory +\/var\/www\/>/,/[:space:]*<\/Directory>/'
+    ar='/[[:space:]]*<Directory +\/var\/www\/>/,/[[:space:]]*<\/Directory>/'
         sed -i -r "${ar}c\\$block" "$1"
     else
         sed -i -r "/[[:space:]]*<\/VirtualHost>/i\\\n$block\n" "$1"
@@ -142,9 +142,14 @@ editsiteconf() {
 #    name: value
 # value may contain spaces and is not followed by a comment.
 # If the name is not found in the file, append the name-value pair
-# to the end of the config file
+# to the end of the config file.
+#
+# When the -r option is used, if the name is found in the file,
+# the line containing the name is removed. If the name is not found,
+# nothing is changed
 #
 # usage: editnpconf filename name value
+#    or: editnpconf filename -r name
 #
 editnpconf() {
     local cf="$1"
@@ -153,12 +158,25 @@ editnpconf() {
     if [ $# -ne 3 ]
     then
         echo "usage: editnpconf filename name value"
+        echo "   or: editnpconf filename -r name"
         return 1
     fi
     if [ ! -e "$cf" ]
     then
         echo "editnpconf: can't find config file: $cf"
         return 1
+    fi
+
+    # if it's the -r (remove) option, remove the line with the name
+    if [ "$nm" = "-r" ]
+    then
+        nm="$3"
+        if grep -E "^[[:space:]]*$nm[[:space:]]+" "$cf" > /dev/null
+        then
+            sed -i -r "/^([[:space:]]*)$nm([[:space:]]+).+$/d" \
+                "$cf"
+        fi
+        return
     fi
 
     # If the name is found, replace the value while preserving indentation
@@ -191,6 +209,36 @@ editcrontab() {
         tab="$tab\n"
     fi
     echo "$tab$2" | crontab -
+}
+
+# set up the appropriate FTP masquerade address in proftpd conf file
+#
+# usage: set_up_ftp_masquerade proftpd_config_file
+#
+set_up_ftp_masquerade() {
+    local proftpcf="$1"
+    local masq=`get_config $confile masquerade`
+    if [ "$masq" = "" ]   # no masquerade spec
+    then
+        local extip
+        if extip=`get_external_ip`
+        then
+            editnpconf "$proftpcf" MasqueradeAddress $extip
+        else
+            echo "Cannot determine external IP address--set masquerade \c"
+            echo "variable in $confile"
+            return 1
+        fi
+    elif [ "$masq" = "localif" ]  # remove name & let server use local i/f's ip
+    then
+        editnpconf "$proftpcf" -r MasqueradeAddress
+    elif is_ip_addr_form "$masq"
+    then
+        editnpconf "$proftpcf" MasqueradeAddress "$masq"
+    else
+        echo "masquerade value is not an ip address"
+        return 1
+    fi
 }
 
 # take the config information and build the server
@@ -353,15 +401,10 @@ configure() {
     # limit the upload user's group (==username) to the html subdir of /var/www
     editnpconf $cf DefaultRoot "~/html $up_user"
     # set the passive port range; must agree w/ firewall rules for this server
-    editnpconf $cf PassivePorts "60000 60999"
-    # if we're running in an AWS EC2 instance, get the public IP address
+    editnpconf $cf PassivePorts "60000 60099"
+    # set up the proftpd MasqueradeAddress spec
     # so proftpd can tell the client how to do passive mode
-    local pubip
-    if pubip=`curl -s -m 4 \
-        http://169.254.169.254/latest/meta-data/public-ipv4`
-    then    # sucess, we're on AWS; add the Masquerade line
-        editnpconf $cf MasqueradeAddress "$pubip"
-    fi
+    set_up_ftp_masquerade $cf 
         
     # turn off the log files so the root fs will not fill up
     editnpconf $cf SystemLog none
@@ -376,7 +419,7 @@ configure() {
 
     task="installing Python and its imaging library"
     echo "***** $task" | tee /dev/tty
-    install "python python-imaging"
+    install "python python-pil"
 
     task="installing and configuring CommunityView server"
     echo "***** $task" | tee /dev/tty

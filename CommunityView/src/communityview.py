@@ -26,14 +26,15 @@
 #                                                                              #
 ################################################################################
 
-version_string = "1.1.0"
+version_string = "1.2.0"
 
 
 import os
-import Image
-import ImageChops
-import ImageOps
-import ImageDraw
+#import Image
+from PIL import Image
+from PIL import ImageChops
+from PIL import ImageOps
+from PIL import ImageDraw
 import shutil
 import datetime
 import re
